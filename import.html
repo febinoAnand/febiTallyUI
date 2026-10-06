@@ -24,11 +24,11 @@
         </div>
       </header>
 
-      <div class="steps">
-        <div class="step active" id="step-1"><span class="n">1</span>Company</div>
-        <div class="step" id="step-2"><span class="n">2</span>Upload statement &amp; choose bank</div>
-        <div class="step" id="step-3"><span class="n">3</span>Review, validate &amp; push</div>
-      </div>
+      <nav class="steps" aria-label="Import steps">
+        <button type="button" class="step active" id="step-1" data-step="1"><span class="n">1</span>Company</button>
+        <button type="button" class="step" id="step-2" data-step="2"><span class="n">2</span>Upload statement &amp; choose bank</button>
+        <button type="button" class="step" id="step-3" data-step="3"><span class="n">3</span>Review, validate &amp; push</button>
+      </nav>
 
       <!-- Step 1 + 2 -->
       <div id="setup">
@@ -802,6 +802,7 @@
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
   function closeImport() {
+    if (currentId) lastOpenedId = currentId;
     currentId = null;
     $("review").classList.add("hidden");
     $("setup").classList.remove("hidden");
@@ -811,6 +812,39 @@
     renderImports();
   }
   $("new-import-btn").addEventListener("click", closeImport);
+
+  /* ---------- clickable steps ---------- */
+  var lastOpenedId = null;
+  // Import to show for step 3: the one last reviewed, else the newest with work left, else the newest.
+  function importForReview() {
+    if (lastOpenedId && Data.get("stmtImports", lastOpenedId)) return lastOpenedId;
+    var list = Data.list("stmtImports").slice().sort(function (a, b) { return b.uploadedAt.localeCompare(a.uploadedAt); });
+    var open = list.filter(function (i) { var st = Tally.importStats(i); return st.pending + st.validated + st.failed > 0; })[0];
+    return (open || list[0] || {}).id || null;
+  }
+  function flash(el) {
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    el.classList.remove("flash"); void el.offsetWidth; el.classList.add("flash");
+  }
+  $("step-1").addEventListener("click", function () {
+    if (currentId) closeImport();
+    flash($("company").closest(".card"));
+    setTimeout(function () { $("company").focus(); }, 300);
+  });
+  $("step-2").addEventListener("click", function () {
+    if (!company()) { App.toast("Choose a company first.", "info"); $("step-1").click(); return; }
+    if (currentId) closeImport();
+    var card = $("upload-card");
+    if (!canPush) { App.toast("Your role can't upload statements.", "info"); return; }
+    if (!cache()) { App.toast("Fetch this company's ledgers first — they're needed to choose the bank.", "info"); flash($("ledger-status")); return; }
+    flash(card);
+  });
+  $("step-3").addEventListener("click", function () {
+    if (currentId) { window.scrollTo({ top: 0, behavior: "smooth" }); return; }
+    var id = importForReview();
+    if (!id) { App.toast("Upload a statement first — then you can review it here.", "info"); $("step-2").click(); return; }
+    openImport(id);
+  });
 
   /* ---------- filters ---------- */
   function filterState() {

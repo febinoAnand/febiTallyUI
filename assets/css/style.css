@@ -1075,3 +1075,13 @@ tr.clickable { cursor: pointer; }
   .table.compact .ref-sub { display: block; }
 }
 @media (max-width: 760px) { .table.compact .ref-sub { display: none; } .table.compact td.ref-col { display: flex; } }
+
+/* Import steps are clickable buttons */
+button.step { border: 0; border-right: 1px solid var(--border); background: var(--surface); font: inherit; font-weight: 700; font-size: 13px; text-align: left; cursor: pointer; transition: background .15s, color .15s; }
+button.step:last-child { border-right: 0; }
+button.step:hover:not(.active) { background: var(--surface-2); color: var(--text); }
+button.step:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
+button.step.active { background: var(--brand-soft); }
+@media (max-width: 760px) { button.step { border-right: 0; border-bottom: 1px solid var(--border); } }
+@keyframes flashRing { 0% { box-shadow: 0 0 0 0 var(--accent-soft); } 30% { box-shadow: 0 0 0 6px var(--accent-soft); } 100% { box-shadow: 0 0 0 0 transparent; } }
+.flash { animation: flashRing 1.2s ease; }
