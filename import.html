@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/style.css">
+<script src="assets/js/view.js"></script>
 </head>
 <body>
 <div class="layout">
@@ -68,7 +69,7 @@
           <div class="card-head"><div class="card-title"><h2 class="h2">Previous imports</h2></div></div>
           <div class="table-wrap">
             <table class="table stack-sm">
-              <thead><tr><th>#</th><th>File</th><th>Company</th><th>Bank ledger</th><th>Uploaded</th>
+              <thead><tr><th>#</th><th>File</th><th>Company / Bank</th><th>Uploaded</th>
                 <th class="num">Entries</th><th class="num">Pending</th><th class="num">Validated</th>
                 <th class="num">Pushed</th><th class="num">Failed</th><th>Status</th><th></th></tr></thead>
               <tbody id="imports"></tbody>
@@ -467,6 +468,7 @@
     });
     $("dropzone").classList.toggle("disabled", !c || !ch);
     $("upload-btn").disabled = !upload || !upload.file || !c || !ch;
+    $("upload-btn").title = !c ? "Choose a Tally company first" : !ch ? "Fetch ledgers from Tally first" : !upload || !upload.file ? "Choose a statement file first" : "";
     $("ledger-list").innerHTML = ledgerNames().map(function (n) { return '<option value="' + App.esc(n) + '">'; }).join("");
     setStep(!c ? 1 : currentId ? 3 : 2);
   }
@@ -758,12 +760,12 @@
     var page = importsPg.slice(numbered);
     $("imports").innerHTML = page.length ? page.map(function (x) {
       var imp = x.imp, s = Tally.importStats(imp);
-      return '<tr><td class="mono">' + x.n + '</td><td class="cell-strong">' + App.esc(imp.file) + "</td><td>" + App.esc(imp.company) + "</td><td>" + App.esc(imp.bank) + '</td><td style="white-space:nowrap">' + App.dateTime(imp.uploadedAt) + "</td>" +
+      return '<tr><td class="mono">' + x.n + '</td><td class="cell-strong">' + App.esc(imp.file) + "</td><td><span class='cell-strong'>" + App.esc(imp.company) + "</span><span class='cell-sub'>" + App.esc(imp.bank) + '</span></td><td style="white-space:nowrap">' + App.dateTime(imp.uploadedAt) + "</td>" +
         '<td class="num">' + s.total + '</td><td class="num">' + s.pending + '</td><td class="num">' + s.validated + '</td><td class="num">' + s.pushed + '</td><td class="num">' + (s.failed ? '<b style="color:var(--bad)">' + s.failed + "</b>" : 0) + "</td>" +
         '<td><span class="badge badge-' + s.tone + '">' + s.label + "</span></td>" +
         '<td><div class="row-actions"><button class="btn btn-outline btn-xs" data-open="' + imp.id + '">Open</button>' +
         '<button class="btn btn-danger btn-xs" data-perm="delete" data-del="' + imp.id + '" title="Delete import">' + App.icon("trash") + "</button></div></td></tr>";
-    }).join("") : '<tr><td colspan="12"><div class="empty-state">' + App.icon("folder") + "<strong>No imports yet</strong>Upload a bank statement above.</div></td></tr>";
+    }).join("") : '<tr><td colspan="11"><div class="empty-state">' + App.icon("folder") + "<strong>No imports yet</strong>Upload a bank statement above.</div></td></tr>";
   }
   $("imports").addEventListener("click", function (e) {
     var b = e.target.closest("button");
