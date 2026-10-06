@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>e-Invoice · Tally Suite</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<div class="layout">
+  <aside id="sidebar"></aside>
+  <div class="main">
+    <header id="topbar"></header>
+    <main class="content">
+
+      <div class="page-head">
+        <h1>e-Invoice</h1>
+        <div class="page-actions">
+          <button class="btn btn-primary" id="bulkBtn" disabled data-perm="create"><span data-icon="zap"></span>Generate IRN for selected</button>
+        </div>
+      </div>
+
+      <div class="alert-bar" id="gstinAlert" style="background:var(--warn-soft);color:var(--warn);border-left-color:var(--warn)">
+        <span data-icon="alert"></span>
+        <span>Your company has no GSTIN on file. In a live setup, e-Invoice needs a registered GSTIN.</span>
+      </div>
+
+      <div class="stat-grid" id="statGrid"></div>
+
+      <div class="card">
+        <div class="card-head">
+          <div class="segmented" id="statusTabs">
+            <button class="active" data-s="Pending">Pending</button>
+            <button data-s="Generated">Generated</button>
+            <button data-s="Cancelled">Cancelled</button>
+            <button data-s="NA">B2C / Not applicable</button>
+          </div>
+          <div class="search-box"><span data-icon="search"></span><input type="text" id="search" placeholder="Search invoice or party…"></div>
+        </div>
+        <div class="table-wrap">
+          <table class="table stack-sm">
+            <thead><tr><th style="width:36px"><input type="checkbox" id="checkAll" data-perm="create"></th><th>Invoice</th><th>Date</th><th>Buyer</th><th>Buyer GSTIN</th><th class="num">Value</th><th>Status</th><th></th></tr></thead>
+            <tbody id="body"></tbody>
+          </table>
+        </div>
+          <div id="listPager"></div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<div class="modal-overlay" id="viewModal">
+  <div class="modal lg">
+    <div class="modal-head"><h3 id="viewTitle">e-Invoice</h3><button class="icon-btn" data-close="viewModal" data-icon="x"></button></div>
+    <div class="modal-body">
+      <div style="display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start">
+        <div style="text-align:center">
+          <canvas class="qr" id="qrCanvas"></canvas>
+          <div class="muted" style="font-size:11px;margin-top:6px">Signed QR code</div>
+        </div>
+        <dl class="kv" style="flex:1;min-width:260px" id="irnDetails"></dl>
+      </div>
+      <div id="cancelBox" data-perm="delete" class="note-box" style="margin:20px 0 0">
+        <div class="note-title"><span data-icon="alert"></span>Cancel IRN</div>
+        <p class="muted" style="margin:0 0 10px;font-size:12.5px">An IRN can only be cancelled within 24 hours of generation. After that, issue a credit note instead.</p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <select class="select-sm" id="cancelReason" style="flex:1;min-width:180px">
+            <option value="1">Duplicate</option><option value="2">Data entry mistake</option><option value="3">Order cancelled</option><option value="4">Others</option>
+          </select>
+          <button class="btn btn-danger btn-sm" id="cancelBtn"><span data-icon="x"></span>Cancel IRN</button>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" id="jsonBtn"><span data-icon="download"></span>Download JSON</button>
+      <span style="flex:1"></span>
+      <button class="btn btn-ghost" data-close="viewModal">Close</button>
+      <button class="btn btn-primary" id="printBtn"><span data-icon="printer"></span>Print e-Invoice</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="progressModal">
+  <div class="modal" style="max-width:420px;text-align:center">
+    <div class="modal-body" style="padding:34px 26px">
+      <div style="width:54px;height:54px;margin:0 auto 16px;border-radius:50%;border:4px solid var(--brand-soft);border-top-color:var(--brand);animation:spin 0.9s linear infinite"></div>
+      <h3 style="font-size:17px">Connecting to IRP…</h3>
+      <p class="muted" id="progressText" style="margin:6px 0 0;font-size:13px">Validating invoice schema</p>
+    </div>
+  </div>
+</div>
+
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+<script src="assets/js/tally.js"></script>
+<script src="assets/js/items.js"></script>
+<script>
+  var tenant = App.renderShell({ active: "einvoice", title: "e-Invoice", subtitle: "GST compliance · IRN" });
+  var $ = function (id) { return document.getElementById(id); };
+  var listPg = App.pager("listPager", render, {});
+  var status = "Pending", viewingId = null;
+  if (!tenant.gstin) $("gstinAlert").classList.add("show");
+
+  function statusOf(v) {
+    if (!v.partyGstin) return "NA";
+    return v.einvoice ? v.einvoice.status : "Pending";
+  }
+  function sales() { return Data.list("vouchers").filter(function (v) { return v.type === "Sales"; }); }
+
+  function renderStats() {
+    var s = sales(), c = { Pending: 0, Generated: 0, Cancelled: 0, NA: 0 };
+    s.forEach(function (v) { c[statusOf(v)]++; });
+    var items = [
+      { label: "Pending IRN", value: c.Pending, sub: "B2B invoices awaiting IRN", icon: "clock", tone: "warn" },
+      { label: "IRN Generated", value: c.Generated, sub: "Registered on IRP", icon: "checkCircle", tone: "good" },
+      { label: "Cancelled", value: c.Cancelled, sub: "Cancelled within 24h", icon: "x", tone: "bad" },
+      { label: "B2C / Exempt", value: c.NA, sub: "No buyer GSTIN", icon: "users", tone: "info" }
+    ];
+    $("statGrid").innerHTML = items.map(function (x) {
+      return '<div class="stat-card" style="--tint:var(--' + x.tone + ')"><div class="stat-top"><span class="stat-label">' + x.label + '</span><span class="stat-icon tone-' + x.tone + '">' + App.icon(x.icon) + '</span></div><div class="stat-value">' + x.value + '</div><div class="stat-sub">' + x.sub + "</div></div>";
+    }).join("");
+  }
+
+  var BADGE = { Pending: '<span class="badge badge-warn">Pending</span>', Generated: '<span class="badge badge-good">Generated</span>', Cancelled: '<span class="badge badge-bad">Cancelled</span>', NA: '<span class="badge badge-muted">Not applicable</span>' };
+
+  function render() {
+    var q = $("search").value.trim().toLowerCase();
+    var rows = sales().filter(function (v) { return statusOf(v) === status && (!q || (v.number + v.party).toLowerCase().indexOf(q) !== -1); })
+      .sort(function (a, b) { return b.date.localeCompare(a.date); });
+    $("checkAll").checked = false;
+    $("checkAll").disabled = status !== "Pending";
+    var rowsPage = listPg.slice(rows);
+    $("body").innerHTML = rowsPage.length ? rowsPage.map(function (v) {
+      var st = statusOf(v);
+      return "<tr><td>" + (st === "Pending" ? '<input type="checkbox" data-perm="create" class="row-check" value="' + v.id + '">' : "") + '</td><td class="mono cell-strong">' + v.number + "</td><td>" + App.date(v.date) + "</td>" +
+        "<td><span class='cell-strong'>" + App.esc(v.party) + "</span><span class='cell-sub'>" + App.esc(v.partyState || "") + "</span></td>" +
+        '<td class="mono" style="font-size:12px">' + (v.partyGstin || "—") + '</td><td class="num cell-strong">' + App.inr(v.total) + "</td><td>" + BADGE[st] +
+        (v.einvoice && v.einvoice.ackNo ? "<span class='cell-sub mono'>Ack " + v.einvoice.ackNo + "</span>" : "") + "</td>" +
+        '<td><div class="row-actions">' + (st === "Pending" ? '<button class="btn btn-accent btn-xs" data-perm="create" data-gen="' + v.id + '">' + App.icon("zap") + "Generate</button>" : "") +
+        (st === "Generated" || st === "Cancelled" ? '<button class="btn btn-ghost btn-xs" data-view="' + v.id + '">' + App.icon("eye") + "View</button>" : "") + "</div></td></tr>";
+    }).join("") : App.emptyRow(8, "Nothing here", status === "Pending" ? "All B2B invoices have an IRN. Nice work!" : "No invoices in this status.");
+    syncBulk();
+  }
+
+  function syncBulk() {
+    var n = document.querySelectorAll(".row-check:checked").length;
+    $("bulkBtn").disabled = n === 0;
+    $("bulkBtn").lastChild.textContent = n ? "Generate IRN for " + n + " selected" : "Generate IRN for selected";
+  }
+
+  $("statusTabs").addEventListener("click", function (e) {
+    var b = e.target.closest("button");
+    if (!b) return;
+    status = b.dataset.s;
+    $("statusTabs").querySelectorAll("button").forEach(function (x) { x.classList.toggle("active", x === b); });
+    render();
+  });
+  $("search").addEventListener("input", render);
+  $("checkAll").addEventListener("change", function () {
+    var on = this.checked;
+    document.querySelectorAll(".row-check").forEach(function (c) { c.checked = on; });
+    syncBulk();
+  });
+  $("body").addEventListener("change", function (e) { if (e.target.classList.contains("row-check")) syncBulk(); });
+  $("body").addEventListener("click", function (e) {
+    var b = e.target.closest("button");
+    if (!b) return;
+    if (b.dataset.gen) generate([b.dataset.gen]);
+    if (b.dataset.view) openView(b.dataset.view);
+  });
+  $("bulkBtn").addEventListener("click", function () {
+    generate(Array.prototype.map.call(document.querySelectorAll(".row-check:checked"), function (c) { return c.value; }));
+  });
+
+  /* Simulated IRP round-trip: validate → sign → register. */
+  function generate(ids) {
+    var steps = ["Validating invoice schema", "Authenticating GSTIN " + (tenant.gstin || "(demo)"), "Signing payload", "Registering IRN"];
+    var i = 0;
+    $("progressText").textContent = steps[0];
+    App.openModal("progressModal");
+    var timer = setInterval(function () {
+      i++;
+      if (i < steps.length) { $("progressText").textContent = steps[i]; return; }
+      clearInterval(timer);
+      var vs = Data.list("vouchers");
+      vs.forEach(function (v) {
+        if (ids.indexOf(v.id) === -1) return;
+        v.einvoice = {
+          irn: Data.fakeHash(v.number + "|" + v.total + "|" + Date.now()),
+          ackNo: "11" + String(Date.now()).slice(-10) + String(Math.floor(Math.random() * 90 + 10)),
+          ackDate: new Date().toISOString(),
+          status: "Generated"
+        };
+      });
+      Data.save("vouchers", vs);
+      App.closeModal("progressModal");
+      App.toast("IRN generated for " + ids.length + " invoice" + (ids.length > 1 ? "s" : "") + ".");
+      renderStats(); render();
+      if (ids.length === 1) openView(ids[0]);
+    }, 450);
+  }
+
+  function openView(id) {
+    var v = Data.get("vouchers", id), e = v.einvoice;
+    viewingId = id;
+    $("viewTitle").textContent = "e-Invoice · " + v.number;
+    App.drawQr($("qrCanvas"), e.irn);
+    $("irnDetails").innerHTML =
+      "<dt>Status</dt><dd>" + BADGE[e.status] + "</dd>" +
+      '<dt>IRN</dt><dd class="mono" style="font-size:11.5px">' + e.irn + "</dd>" +
+      '<dt>Ack No.</dt><dd class="mono">' + e.ackNo + "</dd>" +
+      "<dt>Ack Date</dt><dd>" + App.dateTime(e.ackDate) + "</dd>" +
+      "<dt>Buyer</dt><dd>" + App.esc(v.party) + ' · <span class="mono">' + App.esc(v.partyGstin) + "</span></dd>" +
+      "<dt>Invoice value</dt><dd>" + App.inr(v.total) + "</dd>" +
+      (e.status === "Cancelled" ? "<dt>Cancelled</dt><dd>" + App.dateTime(e.cancelledAt) + " · " + App.esc(e.cancelReason) + "</dd>" : "");
+    var within24h = e.status === "Generated" && (Date.now() - new Date(e.ackDate).getTime()) < 24 * 3600 * 1000;
+    $("cancelBox").style.display = within24h ? "" : "none";
+    App.openModal("viewModal");
+  }
+
+  $("cancelBtn").addEventListener("click", function () {
+    App.confirm({ title: "Cancel this IRN?", message: "This can't be undone.", ok: "Cancel IRN", danger: true }).then(function (ok) {
+      if (!ok) return;
+      var sel = $("cancelReason");
+      var v = Data.get("vouchers", viewingId);
+      v.einvoice.status = "Cancelled";
+      v.einvoice.cancelledAt = new Date().toISOString();
+      v.einvoice.cancelReason = sel.options[sel.selectedIndex].text;
+      Data.update("vouchers", viewingId, { einvoice: v.einvoice });
+      App.toast("IRN cancelled.", "info");
+      openView(viewingId); renderStats(); render();
+    });
+  });
+
+  $("printBtn").addEventListener("click", function () { Items.print(Items.preview(Data.get("vouchers", viewingId), tenant, "TAX INVOICE")); });
+
+  // Shape loosely follows the GST e-invoice schema (INV-01) — enough to show what gets sent.
+  $("jsonBtn").addEventListener("click", function () {
+    var v = Data.get("vouchers", viewingId);
+    var json = {
+      Version: "1.1",
+      TranDtls: { TaxSch: "GST", SupTyp: "B2B" },
+      DocDtls: { Typ: "INV", No: v.number, Dt: v.date.split("-").reverse().join("/") },
+      SellerDtls: { Gstin: tenant.gstin, LglNm: tenant.companyName, Stcd: tenant.state },
+      BuyerDtls: { Gstin: v.partyGstin, LglNm: v.party, Pos: v.partyState },
+      ItemList: v.items.map(function (it, i) {
+        return { SlNo: String(i + 1), PrdDesc: it.name, HsnCd: it.hsn, Qty: it.qty, Unit: it.unit, UnitPrice: it.rate, AssAmt: it.qty * it.rate, GstRt: it.gst };
+      }),
+      ValDtls: { AssVal: v.subtotal, CgstVal: v.cgst, SgstVal: v.sgst, IgstVal: v.igst, TotInvVal: v.total },
+      Irn: v.einvoice.irn, AckNo: v.einvoice.ackNo, AckDt: v.einvoice.ackDate
+    };
+    App.downloadFile(v.number.replace(/\//g, "-") + "_einvoice.json", JSON.stringify(json, null, 2), "application/json");
+  });
+
+  renderStats(); render();
+</script>
+</body>
+</html>

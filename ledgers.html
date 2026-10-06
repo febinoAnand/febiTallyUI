@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ledgers · FebiTally</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<div class="layout">
+  <aside id="sidebar"></aside>
+  <div class="main">
+    <header id="topbar"></header>
+    <main class="content">
+
+      <header class="page-head">
+        <h1>Ledgers</h1>
+        <div class="page-actions">
+          <span class="format-chip" id="formatChip"></span>
+          <button class="btn btn-outline btn-sm" id="last-response-btn" disabled title="No Tally request yet">Last Tally response</button>
+        </div>
+      </header>
+
+      <div class="card">
+        <div class="card-body">
+          <div class="row">
+            <div class="field" style="max-width:360px;flex-basis:280px">
+              <label for="company">Company</label>
+              <select id="company"></select>
+            </div>
+            <button class="btn btn-primary" id="fetch-btn"><span data-icon="refresh"></span>Fetch from Tally</button>
+            <button class="btn btn-outline" id="add-btn" data-perm="create"><span data-icon="plus"></span>New ledger</button>
+            <div class="muted small" id="fetch-info" style="padding-bottom:10px"></div>
+          </div>
+          <div id="company-alert" class="alert alert-warning hidden" style="margin-top:14px"></div>
+        </div>
+      </div>
+
+      <div class="card mt">
+        <div class="card-head">
+          <div class="card-title"><h2 class="h2">Ledgers <span class="muted" id="count"></span></h2></div>
+          <div class="toolbar">
+            <select id="group-filter" class="select-sm" style="width:200px"><option value="">All groups</option></select>
+            <div class="search-box"><span data-icon="search"></span><input type="text" id="search" placeholder="Search ledgers…"></div>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="table stack-sm">
+            <thead><tr>
+              <th class="sortable" data-sort="name">Name</th>
+              <th class="sortable" data-sort="parent">Group</th>
+              <th class="sortable num" data-sort="opening_balance">Opening balance</th>
+              <th class="sortable num" data-sort="closing_balance">Closing balance</th>
+              <th>Fetched</th>
+              <th style="width:120px"></th>
+            </tr></thead>
+            <tbody id="ledger-rows"><tr><td colspan="6"><div class="empty-state">Select a company.</div></td></tr></tbody>
+          </table>
+        </div>
+        <div id="ledgerPager"></div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<!-- New / edit ledger -->
+<div class="modal-overlay" id="ledger-modal">
+  <form class="modal" id="ledger-form" novalidate>
+    <div class="modal-head"><h3 id="modal-title">New ledger</h3><button type="button" class="icon-btn" data-close="ledger-modal" data-icon="x" aria-label="Close"></button></div>
+    <div class="modal-body">
+      <div class="field" style="margin-bottom:14px">
+        <label for="f-name">Name</label>
+        <input type="text" id="f-name" required autocomplete="off">
+      </div>
+      <div class="field" style="margin-bottom:14px">
+        <label for="f-parent">Group (under)</label>
+        <input type="text" id="f-parent" list="group-list" required placeholder="e.g. Sundry Creditors" autocomplete="off">
+        <datalist id="group-list"></datalist>
+      </div>
+      <div class="field" style="margin-bottom:14px">
+        <label for="f-opening">Opening balance</label>
+        <input type="number" id="f-opening" step="0.01" value="0">
+        <div class="help">Negative = Debit, positive = Credit (Tally convention). <span id="f-opening-read"></span></div>
+      </div>
+      <div class="alert alert-error small hidden" id="ledger-error" style="margin-bottom:12px"></div>
+      <div class="alert alert-info small" style="margin:0">This change is written to Tally Prime immediately.</div>
+    </div>
+    <div class="modal-foot">
+      <button type="button" class="btn btn-ghost" data-close="ledger-modal">Cancel</button>
+      <button type="submit" class="btn btn-primary" id="save-ledger">Save to Tally</button>
+    </div>
+  </form>
+</div>
+
+<!-- Ledger statement (primary company) -->
+<div class="modal-overlay" id="stmtModal">
+  <div class="modal lg">
+    <div class="modal-head"><h3 id="stmtTitle">Ledger statement</h3><button class="icon-btn" data-close="stmtModal" data-icon="x" aria-label="Close"></button></div>
+    <div class="table-wrap">
+      <table class="table stack-sm">
+        <thead><tr><th>Date</th><th>Voucher</th><th>Particulars</th><th class="num">Debit</th><th class="num">Credit</th><th class="num">Balance</th></tr></thead>
+        <tbody id="stmtBody"></tbody>
+      </table>
+    </div>
+    <div id="stmtPager"></div>
+  </div>
+</div>
+
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+<script src="assets/js/tally.js"></script>
+<script>
+  var tenant = App.renderShell({ active: "ledger", title: "Ledgers" });
+  var $ = function (id) { return document.getElementById(id); };
+  var sortKey = "name", sortDir = 1, editing = null;
+  var pg = App.pager("ledgerPager", renderRows, { resetOn: ["#company"] });
+
+  function balText(n) { n = Number(n) || 0; return n === 0 ? "—" : App.inr(Math.abs(n)) + (n < 0 ? " Dr" : " Cr"); }
+
+  /* ---------------- Header: format chip + last response ---------------- */
+  function syncHeader() {
+    $("formatChip").textContent = Tally.format().toUpperCase();
+    var last = Tally.lastResponse();
+    $("last-response-btn").disabled = !last;
+    $("last-response-btn").title = last ? "Show the last request sent to Tally" : "No Tally request yet";
+  }
+  $("last-response-btn").addEventListener("click", function () {
+    var last = Tally.lastResponse();
+    if (last) App.showResponse(last.title, last.sub, last.body);
+  });
+
+  /* ---------------- Company + fetch ---------------- */
+  $("company").innerHTML = Tally.companies().map(function (c) { return "<option>" + App.esc(c) + "</option>"; }).join("");
+  var wanted = new URLSearchParams(location.search).get("company");
+  if (wanted && Tally.companies().indexOf(wanted) !== -1) $("company").value = wanted;
+
+  function company() { return $("company").value; }
+
+  function showAlert(html, tone) {
+    var el = $("company-alert");
+    if (!html) { el.classList.add("hidden"); return; }
+    el.className = "alert alert-" + (tone || "warning");
+    el.innerHTML = html;
+  }
+
+  function syncCompanyState() {
+    var c = company(), cache = Tally.cached(c);
+    $("fetch-info").textContent = cache ? cache.ledgers.length + " ledgers · fetched " + App.ago(cache.fetchedAt) : "";
+    if (!Tally.reachable()) {
+      showAlert("Tally Prime isn't reachable at " + App.esc(Tally.address()) + ". Showing the last fetched list." + (App.can("settings", "view") ? ' <a class="btn btn-sm btn-outline" href="settings.html">Open Settings</a>' : ""), "error");
+    } else if (!cache) {
+      showAlert("Ledgers for <b>" + App.esc(c) + "</b> haven't been fetched yet. Click <b>Fetch from Tally</b> to load them.");
+    } else if (Tally.isPrimary(c)) {
+      var diff = Math.round(Data.list("ledgers").reduce(function (s, l) { return s + (l.balanceType === "Cr" ? -1 : 1) * (Number(l.openingBalance) || 0); }, 0) * 100) / 100;
+      showAlert(diff ? "Difference in opening balances: <b>" + App.inr(Math.abs(diff)) + (diff > 0 ? " Dr" : " Cr") + "</b>. Opening debits and credits should match — adjust a ledger's opening balance (often Capital) to clear it." : "");
+    } else showAlert("");
+    // Groups for the filter
+    var groups = {};
+    (cache ? cache.ledgers : []).forEach(function (l) { groups[l.parent] = 1; });
+    var cur = $("group-filter").value;
+    $("group-filter").innerHTML = '<option value="">All groups</option>' + Object.keys(groups).sort().map(function (g) { return "<option" + (g === cur ? " selected" : "") + ">" + App.esc(g) + "</option>"; }).join("");
+    $("add-btn").disabled = !cache;
+    renderRows();
+  }
+  $("company").addEventListener("change", function () { $("group-filter").value = ""; syncCompanyState(); });
+
+  $("fetch-btn").addEventListener("click", function () {
+    var btn = this;
+    btn.disabled = true; btn.lastChild.textContent = "Fetching…";
+    Tally.fetchLedgers(company()).then(function (c) {
+      App.toast(c.ledgers.length + " ledgers fetched from Tally.");
+    }).catch(function (err) {
+      App.toast(err.message, "bad");
+    }).then(function () {
+      btn.disabled = false; btn.lastChild.textContent = "Fetch from Tally";
+      syncHeader(); syncCompanyState();
+    });
+  });
+
+  /* ---------------- Table ---------------- */
+  $("search").addEventListener("input", renderRows);
+  $("group-filter").addEventListener("change", renderRows);
+  document.querySelectorAll("th.sortable").forEach(function (th) {
+    th.addEventListener("click", function () {
+      var k = th.dataset.sort;
+      sortDir = sortKey === k ? -sortDir : 1; sortKey = k;
+      document.querySelectorAll("th.sortable").forEach(function (x) { x.classList.remove("asc", "desc"); });
+      th.classList.add(sortDir > 0 ? "asc" : "desc");
+      renderRows();
+    });
+  });
+  document.querySelector('th[data-sort="name"]').classList.add("asc");
+
+  function renderRows() {
+    var cache = Tally.cached(company());
+    if (!cache) {
+      $("count").textContent = "";
+      pg.slice([]);
+      $("ledger-rows").innerHTML = '<tr><td colspan="6"><div class="empty-state">' + App.icon("folder") + "<strong>No ledgers loaded</strong>Fetch from Tally to see this company's ledgers.</div></td></tr>";
+      return;
+    }
+    var q = $("search").value.trim().toLowerCase(), g = $("group-filter").value;
+    var rows = cache.ledgers.filter(function (l) {
+      return (!g || l.parent === g) && (!q || (l.name + " " + l.parent).toLowerCase().indexOf(q) !== -1);
+    }).sort(function (a, b) {
+      var x = a[sortKey], y = b[sortKey];
+      return (typeof x === "number" ? x - y : String(x).localeCompare(String(y))) * sortDir;
+    });
+    $("count").textContent = "(" + rows.length + (rows.length !== cache.ledgers.length ? " of " + cache.ledgers.length : "") + ")";
+    var primary = Tally.isPrimary(company());
+    var pageRows = pg.slice(rows);
+    $("ledger-rows").innerHTML = pageRows.length ? pageRows.map(function (l) {
+      return '<tr><td class="cell-strong">' + App.esc(l.name) + '</td><td><span class="badge badge-muted plain">' + App.esc(l.parent) + "</span></td>" +
+        '<td class="num">' + balText(l.opening_balance) + '</td><td class="num cell-strong" style="color:' + (l.closing_balance < 0 ? "var(--good)" : l.closing_balance > 0 ? "var(--bad)" : "inherit") + '">' + balText(l.closing_balance) + "</td>" +
+        '<td class="muted" style="white-space:nowrap">' + App.ago(l.fetchedAt) + "</td>" +
+        '<td><div class="row-actions">' +
+          (primary ? '<button class="btn btn-ghost btn-xs" data-view="' + App.esc(l.name) + '" title="Statement">' + App.icon("eye") + "</button>" : "") +
+          '<button class="btn btn-ghost btn-xs" data-perm="edit" data-edit="' + App.esc(l.name) + '" title="Edit">' + App.icon("edit") + "</button>" +
+          '<button class="btn btn-danger btn-xs" data-perm="delete" data-del="' + App.esc(l.name) + '" title="Delete">' + App.icon("trash") + "</button>" +
+        "</div></td></tr>";
+    }).join("") : App.emptyRow(6, "No ledgers match", "Try another search or group.");
+  }
+
+  $("ledger-rows").addEventListener("click", function (e) {
+    var b = e.target.closest("button");
+    if (!b) return;
+    if (b.dataset.view) showStatement(b.dataset.view);
+    if (b.dataset.edit) openModal(b.dataset.edit);
+    if (b.dataset.del) {
+      var name = b.dataset.del;
+      App.confirm({ title: "Delete ledger?", message: "Delete “" + name + "” from Tally Prime?", detail: "This writes to Tally immediately and can't be undone here.", ok: "Delete", danger: true }).then(function (ok) {
+        if (!ok) return;
+        Tally.deleteLedger(company(), name).then(function () { App.toast("Ledger deleted from Tally."); })
+          .catch(function (err) { App.toast(err.message, "bad"); })
+          .then(function () { syncHeader(); syncCompanyState(); });
+      });
+    }
+  });
+
+  /* ---------------- New / edit modal ---------------- */
+  $("group-list").innerHTML = Tally.groupsOf(company()).map(function (g) { return '<option value="' + App.esc(g) + '">'; }).join("");
+  function readOpening() {
+    var v = Number($("f-opening").value) || 0;
+    $("f-opening-read").textContent = v ? "→ " + App.inr(Math.abs(v)) + (v < 0 ? " Debit" : " Credit") : "";
+  }
+  $("f-opening").addEventListener("input", readOpening);
+
+  function openModal(name) {
+    var l = name ? Tally.cached(company()).ledgers.filter(function (x) { return x.name === name; })[0] : null;
+    editing = l ? l.name : null;
+    $("modal-title").textContent = l ? "Edit ledger" : "New ledger";
+    $("f-name").value = l ? l.name : "";
+    $("f-parent").value = l ? l.parent : "";
+    $("f-opening").value = l ? l.opening_balance : 0;
+    $("ledger-error").classList.add("hidden");
+    readOpening();
+    App.openModal("ledger-modal");
+    setTimeout(function () { $("f-name").focus(); }, 50);
+  }
+  $("add-btn").addEventListener("click", function () { openModal(null); });
+
+  $("ledger-form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var input = { name: $("f-name").value, parent: $("f-parent").value, opening: Number($("f-opening").value) || 0 };
+    var btn = $("save-ledger");
+    btn.disabled = true; btn.textContent = "Saving…";
+    var call = editing ? Tally.alterLedger(company(), editing, input) : Tally.createLedger(company(), input);
+    call.then(function () {
+      App.closeModal("ledger-modal");
+      App.toast(editing ? "Ledger updated in Tally." : "Ledger “" + input.name.trim() + "” created in Tally.");
+    }).catch(function (err) {
+      $("ledger-error").textContent = err.message;
+      $("ledger-error").classList.remove("hidden");
+    }).then(function () {
+      btn.disabled = false; btn.textContent = "Save to Tally";
+      syncHeader(); syncCompanyState();
+    });
+  });
+
+  /* ---------------- Ledger statement ---------------- */
+  var stmtRows = [];
+  var stmtPg = App.pager("stmtPager", renderStmt, { size: 25 });
+  function renderStmt() { $("stmtBody").innerHTML = stmtPg.slice(stmtRows).join(""); }
+  function showStatement(name) {
+    var l = App.findLedger(name);
+    if (!l) return;
+    $("stmtTitle").textContent = name + " · Statement";
+    var dr = function (n) { return n === 0 ? "—" : App.inr(Math.abs(n)) + " " + (n > 0 ? "Dr" : "Cr"); };
+    var bal = (l.balanceType === "Cr" ? -1 : 1) * (Number(l.openingBalance) || 0);
+    var rows = ['<tr><td>—</td><td>—</td><td class="cell-strong">Opening Balance</td><td class="num"></td><td class="num"></td><td class="num">' + dr(bal) + "</td></tr>"];
+    Data.list("vouchers").slice().sort(function (a, b) { return a.date.localeCompare(b.date); }).forEach(function (v) {
+      Data.postings(v).forEach(function (p) {
+        if (p.ledger !== name) return;
+        bal += p.dr - p.cr;
+        // Particulars = the ledgers on the opposite side of this entry, as in Tally.
+        var other = Data.postings(v).filter(function (x) { return x.ledger !== name && (p.dr ? x.cr : x.dr); }).map(function (x) { return x.ledger; });
+        var particulars = other.length > 2 ? other[0] + " + " + (other.length - 1) + " more" : other.join(", ");
+        rows.push("<tr><td>" + App.date(v.date) + '</td><td><span class="badge badge-muted plain">' + v.type + '</span><span class="cell-sub mono">' + v.number + "</span></td><td>" + App.esc(particulars || "—") +
+          '</td><td class="num">' + (p.dr ? App.inr(p.dr) : "") + '</td><td class="num">' + (p.cr ? App.inr(p.cr) : "") + '</td><td class="num cell-strong">' + dr(bal) + "</td></tr>");
+      });
+    });
+    stmtRows = rows; stmtPg.reset(); renderStmt();
+    App.openModal("stmtModal");
+  }
+
+  syncHeader();
+  syncCompanyState();
+  document.addEventListener("tally:status", syncCompanyState);
+</script>
+</body>
+</html>

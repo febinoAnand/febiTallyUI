@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sign In · Tally Suite</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+
+<div class="entry">
+  <aside class="entry-art">
+    <div class="entry-brand">
+      <span class="mark">T</span>
+      <div><strong>Tally Suite</strong><span>CLOUD ACCOUNTING</span></div>
+    </div>
+
+    <h2>Every entry <em>balanced</em>.<br>Every book in one place.</h2>
+    <p class="entry-lead">Transactions, ledgers, GST and marketplace settlements for your company, available from any browser.</p>
+
+    <div class="ledger-mock" aria-hidden="true">
+      <div class="ledger-mock-head"><span>Day Book · 06 Oct</span><span>FY 26-27</span></div>
+      <table>
+        <tr><td>Sales · Lakshmi Stores</td><td class="amt dr">48,500.00 Dr</td></tr>
+        <tr><td>Receipt · HDFC Bank</td><td class="amt dr">22,000.00 Dr</td></tr>
+        <tr><td>Payment · Office Rent</td><td class="amt cr">30,000.00 Cr</td></tr>
+        <tr><td>Contra · Cash → Bank</td><td class="amt cr">10,000.00 Cr</td></tr>
+        <tr><td>Closing balance</td><td class="amt">5,65,811.40</td></tr>
+      </table>
+    </div>
+
+    <div class="entry-foot"><span>GST ready</span><span>e-Invoice &amp; e-Way Bill</span><span>Each tenant's data kept separate</span></div>
+  </aside>
+
+  <main class="entry-main">
+    <div class="entry-form">
+      <div class="entry-kicker">Tenant sign in</div>
+      <h1 class="entry-title">Open your books</h1>
+      <p class="entry-sub">Use the Company ID you received when you registered.</p>
+
+      <div class="alert-bar" id="formAlert">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="13"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span id="formAlertText">Invalid credentials.</span>
+      </div>
+
+      <form id="loginForm" novalidate>
+        <div class="stack-fields">
+          <div class="field">
+            <label for="tenantId">Company ID</label>
+            <input type="text" id="tenantId" placeholder="e.g. TALLY01" autocomplete="organization" class="mono" style="text-transform:uppercase;letter-spacing:.06em">
+          </div>
+          <div class="field">
+            <label for="username">Username</label>
+            <input type="text" id="username" placeholder="e.g. admin" autocomplete="username">
+          </div>
+          <div class="field">
+            <label for="password">Password</label>
+            <div class="pw-wrap">
+              <input type="password" id="password" placeholder="Enter your password" autocomplete="current-password">
+              <button type="button" class="pw-toggle" id="togglePassword">Show</button>
+            </div>
+          </div>
+          <div class="entry-row">
+            <label class="checkbox"><input type="checkbox" id="remember"> Remember Company ID</label>
+            <a href="#" id="forgotLink">Forgot password?</a>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary entry-submit">Sign in</button>
+      </form>
+
+      <div class="demo-box">
+        <span>Demo: <b>TALLY01</b> · <b>admin</b> · <b>Admin@123</b><br><span style="font-size:11.5px">Staff logins: <b>priya</b>/<b>Priya@123</b> (Accountant), <b>ravi</b>/<b>Ravi@123</b> (Data entry), <b>kavya</b>/<b>Kavya@123</b> (GST)</span></span>
+        <button type="button" class="chip-btn" id="autofillBtn">Autofill</button>
+      </div>
+
+      <div class="entry-switch">New company? <a href="register.html">Register your company →</a></div>
+    </div>
+  </main>
+</div>
+
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+  var form = document.getElementById("loginForm");
+  var tenantInput = document.getElementById("tenantId");
+  var userInput = document.getElementById("username");
+  var passInput = document.getElementById("password");
+  var remember = document.getElementById("remember");
+  var formAlert = document.getElementById("formAlert");
+  var formAlertText = document.getElementById("formAlertText");
+
+  if (App.isLoggedIn()) window.location.replace("dashboard.html");
+
+  try {
+    var savedId = localStorage.getItem("tally_remember_tenant");
+    if (savedId) { tenantInput.value = savedId; remember.checked = true; }
+  } catch (e) { /* ignore */ }
+
+  document.getElementById("togglePassword").addEventListener("click", function () {
+    var show = passInput.type === "password";
+    passInput.type = show ? "text" : "password";
+    this.textContent = show ? "Hide" : "Show";
+  });
+
+  document.getElementById("autofillBtn").addEventListener("click", function () {
+    tenantInput.value = "TALLY01"; userInput.value = "admin"; passInput.value = "Admin@123";
+    clearErrors();
+  });
+
+  document.getElementById("forgotLink").addEventListener("click", function (e) {
+    e.preventDefault();
+    App.toast("A password reset link would be emailed to the tenant admin.", "info");
+  });
+
+  function clearErrors() {
+    [tenantInput, userInput, passInput].forEach(function (el) { el.classList.remove("error"); });
+    formAlert.classList.remove("show");
+  }
+  [tenantInput, userInput, passInput].forEach(function (el) { el.addEventListener("input", clearErrors); });
+
+  function fail(msg) {
+    formAlertText.textContent = msg;
+    formAlert.classList.add("show");
+    [tenantInput, userInput, passInput].forEach(function (el) { el.classList.add("error"); });
+  }
+
+  form.addEventListener("submit", function (e) {
+    e.preventDefault();
+    var id = tenantInput.value.trim().toUpperCase();
+    if (!id || !userInput.value.trim() || !passInput.value) return fail("Please fill in all fields.");
+
+    var res = Data.authenticate(id, userInput.value, passInput.value);
+    if (!res) return fail("Invalid Company ID, username or password.");
+    var tenant = res.tenant;
+
+    try {
+      if (remember.checked) localStorage.setItem("tally_remember_tenant", id);
+      else localStorage.removeItem("tally_remember_tenant");
+    } catch (err) { /* ignore */ }
+
+    if (tenant.status !== "Active") {
+      sessionStorage.setItem("tally_pending_tenant", tenant.tenantId);
+      window.location.href = "awaiting-approval.html";
+      return;
+    }
+    if (res.user.status !== "Active") return fail("This user is inactive. Ask your administrator to reactivate it.");
+    App.login(tenant, res.user);
+    window.location.href = "dashboard.html";
+  });
+</script>
+</body>
+</html>

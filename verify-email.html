@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Verify Email · Tally Suite</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body class="state-page">
+
+<div class="state-card">
+  <div class="state-head">
+    <span class="state-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16v12H4z"/><path d="M4 7l8 6 8-6"/></svg></span>
+    <div><div class="entry-kicker">Step 2 of 3</div><h1>Verify your email</h1></div>
+  </div>
+  <div class="state-body">
+    <p>We've sent a verification link to the address below. Open it to finish registering your company.</p>
+
+    <div class="ticket">
+      <div class="ticket-label">Sent to</div>
+      <div class="ticket-value small" id="pendingEmail">&nbsp;</div>
+      <div class="muted" style="font-size:12.5px;font-weight:600" id="pendingCompany"></div>
+    </div>
+
+    <div class="stack">
+      <button type="button" class="btn btn-primary entry-submit" id="verifyBtn" style="margin-top:0">I've clicked the verification link</button>
+      <div style="display:flex;gap:8px">
+        <button type="button" class="btn btn-outline" id="editBtn" style="flex:1">Edit email</button>
+        <button type="button" class="btn btn-ghost" id="resendBtn" style="flex:1">Resend email</button>
+      </div>
+    </div>
+
+    <div class="state-link">Already have a Company ID? <a href="index.html">Sign in</a></div>
+  </div>
+</div>
+
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+  var pending;
+  try { pending = JSON.parse(sessionStorage.getItem("tally_pending_registration") || "null"); } catch (e) { pending = null; }
+
+  if (!pending || !pending.email) {
+    window.location.replace("register.html");
+  } else {
+    document.getElementById("pendingEmail").textContent = pending.email;
+    document.getElementById("pendingCompany").textContent = pending.companyName;
+  }
+
+  document.getElementById("resendBtn").addEventListener("click", function () {
+    App.toast("Verification email resent to " + pending.email + ".");
+  });
+  document.getElementById("editBtn").addEventListener("click", function () {
+    window.location.href = "register.html";
+  });
+  document.getElementById("verifyBtn").addEventListener("click", function () {
+    var tenant = Data.registerTenant(pending);
+    sessionStorage.removeItem("tally_pending_registration");
+    sessionStorage.setItem("tally_last_registered", tenant.tenantId);
+    window.location.href = "register-success.html";
+  });
+</script>
+</body>
+</html>

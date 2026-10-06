@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Profile · Tally Suite</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<div class="layout">
+  <aside id="sidebar"></aside>
+  <div class="main">
+    <header id="topbar"></header>
+    <main class="content">
+
+      <div class="page-head">
+        <h1>My Profile</h1>
+      </div>
+
+      <div class="grid grid-side-main">
+        <!-- Summary -->
+        <div class="card profile-card" style="align-self:start">
+          <div class="profile-cover"></div>
+          <div class="profile-avatar" id="pAvatar"></div>
+          <h3 id="pName"></h3>
+          <div class="handle" id="pHandle"></div>
+          <div class="profile-badges" id="pBadges"></div>
+          <ul class="profile-facts" id="pFacts"></ul>
+          <div class="card-body">
+            <button class="btn btn-outline btn-block" id="signOutBtn"><span data-icon="logout"></span>Sign out</button>
+          </div>
+        </div>
+
+        <div class="stack" style="gap:18px">
+          <!-- Personal details -->
+          <form class="card" id="detailsForm" novalidate>
+            <div class="card-head"><div class="card-title"><span class="ct-icon" data-icon="edit"></span><div>Personal details<small>How you appear to your team</small></div></div></div>
+            <div class="card-body">
+              <div class="field-grid">
+                <div class="field">
+                  <label for="dName">Full Name <span class="req">*</span></label>
+                  <input type="text" id="dName">
+                  <span class="err-msg" id="errDName">Enter your name.</span>
+                </div>
+                <div class="field">
+                  <label for="dUsername">Username</label>
+                  <input type="text" id="dUsername" disabled>
+                  <span class="field-hint">Ask an administrator to change your username.</span>
+                </div>
+                <div class="field">
+                  <label for="dEmail">Email <span class="req">*</span></label>
+                  <input type="email" id="dEmail">
+                  <span class="err-msg" id="errDEmail">Enter a valid email address.</span>
+                </div>
+                <div class="field">
+                  <label for="dPhone">Phone</label>
+                  <input type="text" id="dPhone" maxlength="10" placeholder="Optional">
+                  <span class="err-msg" id="errDPhone">Enter a valid 10-digit number.</span>
+                </div>
+              </div>
+            </div>
+            <div class="card-foot"><button type="submit" class="btn btn-primary"><span data-icon="check"></span>Save details</button></div>
+          </form>
+
+          <!-- Change password -->
+          <form class="card" id="pwForm" novalidate>
+            <div class="card-head"><div class="card-title"><span class="ct-icon" data-icon="key"></span><div>Change password<small>You'll use the new password next time you sign in</small></div></div></div>
+            <div class="card-body">
+              <div class="field-grid cols-3">
+                <div class="field">
+                  <label for="curPw">Current password <span class="req">*</span></label>
+                  <div class="pw-wrap">
+                    <input type="password" id="curPw" autocomplete="current-password">
+                    <button type="button" class="pw-toggle" data-toggle="curPw">Show</button>
+                  </div>
+                  <span class="err-msg" id="errCurPw">Current password is incorrect.</span>
+                </div>
+                <div class="field">
+                  <label for="newPw">New password <span class="req">*</span></label>
+                  <div class="pw-wrap">
+                    <input type="password" id="newPw" placeholder="At least 6 characters" autocomplete="new-password">
+                    <button type="button" class="pw-toggle" data-toggle="newPw">Show</button>
+                  </div>
+                  <div class="strength" id="pwStrength"><span></span><span></span><span></span><span></span></div>
+                  <span class="strength-label" id="pwStrengthLabel">&nbsp;</span>
+                  <span class="err-msg" id="errNewPw">Use at least 6 characters, different from the current one.</span>
+                </div>
+                <div class="field">
+                  <label for="confirmPw">Confirm new password <span class="req">*</span></label>
+                  <div class="pw-wrap">
+                    <input type="password" id="confirmPw" autocomplete="new-password">
+                    <button type="button" class="pw-toggle" data-toggle="confirmPw">Show</button>
+                  </div>
+                  <span class="err-msg" id="errConfirmPw">Passwords do not match.</span>
+                </div>
+              </div>
+            </div>
+            <div class="card-foot"><button type="submit" class="btn btn-primary"><span data-icon="lock"></span>Update password</button></div>
+          </form>
+
+          <!-- Access -->
+          <div class="card">
+            <div class="card-head"><div class="card-title"><span class="ct-icon" data-icon="shield"></span><div id="accessTitle">My access</div></div></div>
+            <div class="card-body"><div class="access-list" id="accessList"></div></div>
+          </div>
+
+          <!-- Company -->
+          <form class="card" id="companyForm" novalidate>
+            <div class="card-head">
+              <div class="card-title"><span class="ct-icon" data-icon="building"></span><div>Company details<small id="companySub"></small></div></div>
+            </div>
+            <div class="card-body">
+              <div class="field-grid">
+                <div class="field full">
+                  <label for="cName">Company Name <span class="req">*</span></label>
+                  <input type="text" id="cName">
+                  <span class="err-msg" id="errCName">Enter the company name.</span>
+                </div>
+                <div class="field">
+                  <label for="cId">Company ID</label>
+                  <input type="text" id="cId" class="mono" disabled>
+                </div>
+                <div class="field">
+                  <label for="cGstin">GSTIN</label>
+                  <input type="text" id="cGstin" maxlength="15" class="mono" style="text-transform:uppercase">
+                  <span class="err-msg" id="errCGstin">GSTIN must be 15 characters (e.g. 33ABCDE1234F1Z5).</span>
+                </div>
+                <div class="field">
+                  <label for="cState">State</label>
+                  <select id="cState"></select>
+                </div>
+                <div class="field">
+                  <label for="cContact">Contact Number</label>
+                  <input type="text" id="cContact" maxlength="10">
+                  <span class="err-msg" id="errCContact">Enter a valid 10-digit number.</span>
+                </div>
+                <div class="field">
+                  <label for="cType">Business Type</label>
+                  <select id="cType"><option>Trading</option><option>Retail</option><option>Manufacturing</option><option>Services</option><option>E-Commerce Seller</option></select>
+                </div>
+                <div class="field">
+                  <label for="cFy">Financial Year From</label>
+                  <input type="date" id="cFy" disabled>
+                </div>
+              </div>
+            </div>
+            <div class="card-foot" id="companyFoot"><button type="submit" class="btn btn-primary"><span data-icon="check"></span>Save company</button></div>
+          </form>
+
+          <!-- Appearance -->
+          <div class="card">
+            <div class="card-head"><div class="card-title"><span class="ct-icon" data-icon="sun"></span><div>Appearance<small>Saved on this browser</small></div></div></div>
+            <div class="card-body">
+              <div class="theme-options" id="themeOptions">
+                <button type="button" class="theme-opt" data-mode="light"><span class="swatch" style="background:linear-gradient(90deg,#fff 60%,#f5f4ef 60%);"></span>Light</button>
+                <button type="button" class="theme-opt" data-mode="dark"><span class="swatch" style="background:linear-gradient(90deg,#141c19 60%,#0d1311 60%);"></span>Dark</button>
+                <button type="button" class="theme-opt" data-mode="system"><span class="swatch" style="background:linear-gradient(135deg,#fff 50%,#141c19 50%);"></span>Match device</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+<script src="assets/js/tally.js"></script>
+<script>
+  var tenant = App.renderShell({ active: "profile", title: "My Profile", subtitle: "Account" });
+  var $ = function (id) { return document.getElementById(id); };
+  var me = App.currentUser();
+  var isAdmin = me.roleId === Data.ADMIN_ROLE;
+  var ACTION_LABEL = { view: "View", create: "Create", edit: "Edit", delete: "Delete" };
+
+  function setErr(id, errId, bad) {
+    $(id).classList.toggle("error", bad);
+    $(errId).classList.toggle("show", bad);
+    return !bad;
+  }
+  document.querySelectorAll("input").forEach(function (el) {
+    el.addEventListener("input", function () {
+      el.classList.remove("error");
+      var err = el.closest(".field") && el.closest(".field").querySelector(".err-msg");
+      if (err) err.classList.remove("show");
+    });
+  });
+  document.querySelectorAll("[data-toggle]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var input = $(btn.getAttribute("data-toggle"));
+      var show = input.type === "password";
+      input.type = show ? "text" : "password";
+      btn.textContent = show ? "Hide" : "Show";
+    });
+  });
+
+  /* ---------------- Summary card ---------------- */
+  function renderSummary() {
+    me = Data.get("users", me.id);
+    var role = Data.roleById(me.roleId);
+    $("pAvatar").textContent = App.initials(me.name);
+    $("pName").textContent = me.name;
+    $("pHandle").textContent = "@" + me.username;
+    $("pBadges").innerHTML = '<span class="badge badge-brand plain">' + App.esc(role ? role.name : "No role") + "</span>" +
+      (me.owner ? '<span class="badge badge-warn plain">Owner</span>' : "") + '<span class="badge badge-good">Active</span>';
+    var facts = [
+      ["Company", tenant.companyName],
+      ["Company ID", '<span class="mono">' + tenant.tenantId + "</span>"],
+      ["Email", App.esc(me.email || "—")],
+      ["Phone", App.esc(me.phone || "—")],
+      ["Member since", App.date(me.createdAt)],
+      ["Previous sign-in", me.previousLogin ? App.dateTime(me.previousLogin) : "First sign-in"]
+    ];
+    $("pFacts").innerHTML = facts.map(function (f) { return "<li><span>" + f[0] + "</span><span>" + (f[0] === "Company" ? App.esc(f[1]) : f[1]) + "</span></li>"; }).join("");
+  }
+
+  /* ---------------- Personal details ---------------- */
+  $("dName").value = me.name;
+  $("dUsername").value = me.username;
+  $("dEmail").value = me.email || "";
+  $("dPhone").value = me.phone || "";
+
+  $("detailsForm").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var name = $("dName").value.trim(), email = $("dEmail").value.trim(), phone = $("dPhone").value.trim();
+    var ok = [
+      setErr("dName", "errDName", !name),
+      setErr("dEmail", "errDEmail", !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)),
+      setErr("dPhone", "errDPhone", phone !== "" && !/^[6-9]\d{9}$/.test(phone))
+    ].every(Boolean);
+    if (!ok) return;
+    Data.update("users", me.id, { name: name, email: email, phone: phone });
+    if (me.owner) Data.updateTenant(tenant.tenantId, { email: email });
+    App.toast("Your details are saved.");
+    // Sidebar and top bar show the name too, so redraw the page.
+    setTimeout(function () { location.reload(); }, 700);
+  });
+
+  /* ---------------- Change password ---------------- */
+  var STRENGTH = ["Too short", "Weak", "Fair", "Good", "Strong"];
+  $("newPw").addEventListener("input", function () {
+    var v = this.value, bar = $("pwStrength"), score = 0;
+    bar.className = "strength";
+    if (!v) { $("pwStrengthLabel").innerHTML = "&nbsp;"; return; }
+    if (v.length >= 6) score++;
+    if (v.length >= 10) score++;
+    if (/[A-Z]/.test(v) && /[a-z]/.test(v)) score++;
+    if (/\d/.test(v) && /[^A-Za-z0-9]/.test(v)) score++;
+    var level = v.length < 6 ? 1 : Math.max(1, score);
+    bar.classList.add("s" + level);
+    $("pwStrengthLabel").textContent = v.length < 6 ? STRENGTH[0] : STRENGTH[level];
+  });
+
+  // The owner's password lives on the tenant record; everyone else's on their user record.
+  function currentPassword() { return me.owner ? Data.findTenant(tenant.tenantId).password : Data.get("users", me.id).password; }
+
+  $("pwForm").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var cur = $("curPw").value, nw = $("newPw").value, cf = $("confirmPw").value;
+    var ok = [
+      setErr("curPw", "errCurPw", cur !== currentPassword()),
+      setErr("newPw", "errNewPw", nw.length < 6 || nw === cur),
+      setErr("confirmPw", "errConfirmPw", !cf || cf !== nw)
+    ].every(Boolean);
+    if (!ok) return;
+    if (me.owner) Data.updateTenant(tenant.tenantId, { password: nw });
+    else Data.update("users", me.id, { password: nw });
+    $("pwForm").reset();
+    $("newPw").dispatchEvent(new Event("input"));
+    App.toast("Password updated. Use it the next time you sign in.");
+  });
+
+  /* ---------------- Access ---------------- */
+  (function renderAccess() {
+    var role = Data.roleById(me.roleId);
+    var count = 0;
+    $("accessList").innerHTML = Data.MODULES.map(function (m) {
+      var acts = isAdmin ? m.actions : ((role && role.perms[m.key]) || []);
+      if (m.key === "dashboard") acts = ["view"];
+      count += acts.length ? 1 : 0;
+      var chips = acts.length ? acts.map(function (a) { return '<span class="badge ' + (a === "delete" ? "badge-bad" : a === "view" ? "badge-muted" : "badge-brand") + ' plain">' + ACTION_LABEL[a] + "</span>"; }).join("")
+                              : '<span class="badge badge-muted plain">No access</span>';
+      return '<div class="access-item' + (acts.length ? "" : " none") + '"><strong>' + m.label + '</strong><div class="access-chips">' + chips + "</div></div>";
+    }).join("");
+    $("accessTitle").innerHTML = "My access<small>" + App.esc(role ? role.name : "No role") + " · " + count + " of " + Data.MODULES.length + " modules" + (isAdmin ? "" : " · ask an administrator to change your role") + "</small>";
+  })();
+
+  /* ---------------- Company ---------------- */
+  $("cState").innerHTML = Data.INDIAN_STATES.map(function (s) { return "<option>" + s + "</option>"; }).join("");
+  function fillCompany() {
+    var t = Data.findTenant(tenant.tenantId);
+    $("cName").value = t.companyName; $("cId").value = t.tenantId; $("cGstin").value = t.gstin || "";
+    $("cState").value = t.state; $("cContact").value = t.contactNumber || ""; $("cType").value = t.businessType || "Trading";
+    $("cFy").value = t.fyStart;
+  }
+  fillCompany();
+  if (!isAdmin) {
+    ["cName", "cGstin", "cState", "cContact", "cType"].forEach(function (id) { $(id).disabled = true; });
+    $("companyFoot").style.display = "none";
+    $("companySub").textContent = "Only administrators can change company details";
+  } else {
+    $("companySub").textContent = "Shown on invoices, e-Invoices and e-Way Bills";
+  }
+  $("companyForm").addEventListener("submit", function (e) {
+    e.preventDefault();
+    if (!isAdmin) return;
+    var gstin = $("cGstin").value.trim().toUpperCase(), contact = $("cContact").value.trim();
+    var ok = [
+      setErr("cName", "errCName", !$("cName").value.trim()),
+      setErr("cGstin", "errCGstin", gstin !== "" && !/^\d{2}[A-Z]{5}\d{4}[A-Z][A-Z\d]Z[A-Z\d]$/.test(gstin)),
+      setErr("cContact", "errCContact", contact !== "" && !/^[6-9]\d{9}$/.test(contact))
+    ].every(Boolean);
+    if (!ok) return;
+    Data.updateTenant(tenant.tenantId, { companyName: $("cName").value.trim(), gstin: gstin, state: $("cState").value, contactNumber: contact, businessType: $("cType").value });
+    App.toast("Company details saved.");
+    setTimeout(function () { location.reload(); }, 700);
+  });
+
+  /* ---------------- Appearance ---------------- */
+  function markTheme() {
+    var mode = App.themeMode();
+    $("themeOptions").querySelectorAll(".theme-opt").forEach(function (b) { b.classList.toggle("active", b.dataset.mode === mode); });
+  }
+  $("themeOptions").addEventListener("click", function (e) {
+    var b = e.target.closest(".theme-opt");
+    if (!b) return;
+    App.setTheme(b.dataset.mode);
+    markTheme();
+  });
+  // The top-bar toggle also changes the theme; keep this card in step.
+  document.getElementById("themeToggle").addEventListener("click", function () { setTimeout(markTheme, 0); });
+  markTheme();
+
+  $("signOutBtn").addEventListener("click", App.logout);
+  renderSummary();
+</script>
+</body>
+</html>

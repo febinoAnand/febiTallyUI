@@ -1,0 +1,1250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Import Statement · FebiTally</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<div class="layout">
+  <aside id="sidebar"></aside>
+  <div class="main">
+    <header id="topbar"></header>
+    <main class="content">
+
+      <header class="page-head">
+        <h1>Import Bank Statement</h1>
+        <div class="page-actions">
+          <span class="format-chip" id="formatChip"></span>
+          <button class="btn btn-outline btn-sm" id="last-response-btn" disabled title="No Tally request yet">Last Tally response</button>
+          <button class="btn btn-primary hidden" id="new-import-btn" data-perm="create"><span data-icon="plus"></span>New import</button>
+        </div>
+      </header>
+
+      <div class="steps">
+        <div class="step active" id="step-1"><span class="n">1</span>Company</div>
+        <div class="step" id="step-2"><span class="n">2</span>Upload statement &amp; choose bank</div>
+        <div class="step" id="step-3"><span class="n">3</span>Review, validate &amp; push</div>
+      </div>
+
+      <!-- Step 1 + 2 -->
+      <div id="setup">
+        <div class="card">
+          <div class="card-head"><div class="card-title"><h2 class="h2">1. Company</h2></div></div>
+          <div class="card-body">
+            <div id="tally-alert" class="alert alert-error hidden" style="margin-bottom:14px"></div>
+            <div class="row row-top">
+              <div class="field" style="max-width:520px">
+                <label for="company">Company (open in Tally Prime)</label>
+                <select id="company"></select>
+                <div class="help">The bank account is chosen after you upload the statement.</div>
+              </div>
+            </div>
+            <div id="ledger-status" style="margin-top:14px"></div>
+          </div>
+        </div>
+
+        <div class="card mt" id="upload-card" data-perm="create">
+          <div class="card-head"><div class="card-title"><h2 class="h2">2. Upload statement</h2></div><span class="muted small">PDF, Excel (.xlsx / .xls) or CSV</span></div>
+          <div class="card-body">
+            <label class="dropzone" id="dropzone" for="file">
+              <div class="dropzone-icon" data-icon="upload"></div>
+              <strong id="file-label">Drop the bank statement here, or click to choose</strong>
+              <p>Columns such as Date, Narration, Withdrawal, Deposit, Balance are detected automatically</p>
+              <span class="file-chosen hidden" id="file-chosen"></span>
+              <input type="file" id="file" accept=".pdf,.xlsx,.xls,.csv" hidden>
+            </label>
+            <div class="toolbar" style="margin-top:14px">
+              <button class="btn btn-primary" id="upload-btn" disabled>Upload &amp; map columns</button>
+              <span class="muted small">No statement handy? <a href="#" id="sample-link">Use a sample CSV</a></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card mt">
+          <div class="card-head"><div class="card-title"><h2 class="h2">Previous imports</h2></div></div>
+          <div class="table-wrap">
+            <table class="table stack-sm">
+              <thead><tr><th>#</th><th>File</th><th>Company</th><th>Bank ledger</th><th>Uploaded</th>
+                <th class="num">Entries</th><th class="num">Pending</th><th class="num">Validated</th>
+                <th class="num">Pushed</th><th class="num">Failed</th><th>Status</th><th></th></tr></thead>
+              <tbody id="imports"></tbody>
+            </table>
+          </div>
+          <div id="importsPager"></div>
+        </div>
+      </div>
+
+      <!-- Step 3 -->
+      <div id="review" class="hidden">
+        <div class="card">
+          <div class="card-head">
+            <div>
+              <h2 class="h2" id="review-title">Import</h2>
+              <div class="muted small" id="review-sub"></div>
+            </div>
+            <div class="toolbar">
+              <button class="btn btn-outline" id="validate-btn" data-perm="edit"><span data-icon="check"></span>Validate selected</button>
+              <button class="btn btn-primary" id="push-btn" data-perm="create"><span data-icon="upload"></span>Push validated to Tally</button>
+            </div>
+          </div>
+          <div class="card-body" style="padding-bottom:0">
+            <div class="toolbar" style="margin-bottom:14px">
+              <div class="filters" id="filters">
+                <button data-filter="all" class="active">All <span class="c"></span></button>
+                <button data-filter="pending">Pending <span class="c"></span></button>
+                <button data-filter="validated">Validated <span class="c"></span></button>
+                <button data-filter="failed">Failed <span class="c"></span></button>
+                <button data-filter="pushed">Pushed <span class="c"></span></button>
+                <button data-filter="skipped">Skipped <span class="c"></span></button>
+              </div>
+              <span class="spacer"></span>
+              <div class="search-box"><span data-icon="search"></span><input type="search" id="entry-search" placeholder="Search narration, ledger, ref…" style="width:230px"></div>
+              <button type="button" class="btn btn-outline btn-sm" id="filter-toggle" aria-expanded="false" aria-controls="filter-panel">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 5h18l-7 8v6l-4 2v-8z"/></svg>
+                Filters <span class="count-pill hidden" id="filter-count"></span></button>
+            </div>
+            <div class="filter-panel hidden" id="filter-panel">
+              <div class="filter-grid">
+                <div class="field"><label for="f-from">Date from</label><input type="date" id="f-from"></div>
+                <div class="field"><label for="f-to">Date to</label><input type="date" id="f-to"></div>
+                <div class="field"><label for="f-dir">Type</label>
+                  <select id="f-dir">
+                    <option value="">Withdrawals &amp; deposits</option>
+                    <option value="out">Withdrawals only</option>
+                    <option value="in">Deposits only</option>
+                  </select></div>
+                <div class="field"><label for="f-vtype">Voucher</label>
+                  <select id="f-vtype">
+                    <option value="">Any voucher type</option>
+                    <option>Payment</option><option>Receipt</option><option>Contra</option>
+                  </select></div>
+                <div class="field"><label for="f-ledger-mode">Ledger</label>
+                  <select id="f-ledger-mode">
+                    <option value="">Any ledger</option>
+                    <option value="unset">Not set</option>
+                    <option value="missing">Not in Tally</option>
+                    <option value="is">Is…</option>
+                  </select>
+                  <input type="text" id="f-ledger" list="ledger-list" placeholder="Ledger name" class="hidden" style="margin-top:6px"></div>
+                <div class="field"><label for="f-min">Amount</label>
+                  <div class="range">
+                    <input type="number" id="f-min" min="0" step="0.01" placeholder="Min" aria-label="Minimum amount">
+                    <span class="muted">–</span>
+                    <input type="number" id="f-max" min="0" step="0.01" placeholder="Max" aria-label="Maximum amount">
+                  </div></div>
+              </div>
+            </div>
+            <div class="bulk-bar hidden" id="bulk-bar" role="region" aria-label="Actions for selected rows">
+              <span class="bulk-count" id="bulk-count"></span>
+              <button type="button" class="btn btn-sm" id="fill-btn" data-perm="edit">Set ledger…</button>
+              <button type="button" class="btn btn-sm" id="vtype-btn" data-perm="edit">Set voucher type…</button>
+              <button type="button" class="btn btn-sm" id="skip-btn" data-perm="edit">Skip</button>
+              <span class="spacer"></span>
+              <button type="button" class="btn btn-sm" id="clear-selection">Clear selection</button>
+            </div>
+            <div class="filter-bar hidden" id="filter-bar">
+              <div class="chips" id="filter-chips"></div>
+              <span class="spacer"></span>
+              <span class="small" id="filter-summary"></span>
+              <button type="button" class="btn btn-outline btn-sm" id="filter-clear">Clear filters</button>
+            </div>
+          </div>
+          <div class="has-overlay">
+            <div class="loading-overlay hidden" id="busy" role="status" aria-live="polite">
+              <div class="loading-box"><div class="spinner" aria-hidden="true"></div><div class="loading-title" id="busy-title">Working…</div><div class="muted small" id="busy-sub"></div></div>
+            </div>
+            <div class="table-wrap">
+              <table class="table stack-sm compact">
+                <thead><tr>
+                  <th class="chk"><input type="checkbox" id="check-all" aria-label="Select all on this page"></th>
+                  <th>Date</th><th>Narration</th><th class="ref-col">Ref / Chq</th>
+                  <th class="num">Withdrawal</th><th class="num">Deposit</th>
+                  <th>Ledger</th><th>Voucher</th><th>Status</th><th></th>
+                </tr></thead>
+                <tbody id="entries"></tbody>
+              </table>
+            </div>
+            <div id="entriesPager"></div>
+            <div class="results-foot">
+              <div class="sum" id="totals"></div>
+              <span class="muted small kbd-hint" title="Tab: next row's ledger (Shift+Tab: previous). Enter on a name that is not in Tally: create it. Click a narration to edit it.">
+                <kbd>Tab</kbd> next ledger · <kbd>Enter</kbd> create new ledger · click a narration to edit</span>
+            </div>
+          </div>
+        </div>
+        <datalist id="ledger-list"></datalist>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<!-- Column mapping -->
+<div class="modal-overlay" id="mapping-modal">
+  <div class="modal xwide has-overlay" role="dialog" aria-labelledby="map-title">
+    <div class="loading-overlay hidden" id="map-loading" role="status" aria-live="polite">
+      <div class="loading-box"><div class="spinner" aria-hidden="true"></div><div class="loading-title">Updating preview…</div><div class="muted small">Applying your column choices to the statement</div></div>
+    </div>
+    <div class="modal-head">
+      <div>
+        <h3 id="map-title">Map statement columns</h3>
+        <div class="muted small"><span id="map-sub"></span> · Bank: <b id="map-bank"></b> <a href="#" id="map-change-bank">Change</a></div>
+      </div>
+      <button class="icon-btn" data-close="mapping-modal" data-icon="x" aria-label="Close"></button>
+    </div>
+    <div class="modal-body">
+      <div id="map-alert"></div>
+      <div class="row" style="margin-bottom:4px">
+        <div class="field" style="max-width:420px">
+          <label for="map-header-row">Header row</label>
+          <select id="map-header-row"></select>
+          <div class="help">The row with the column titles; transactions start below it. You can also click a row in the file preview.</div>
+        </div>
+      </div>
+      <div class="map-grid" id="map-fields"></div>
+      <h3 class="section-title">File preview <span class="muted small" id="map-raw-note"></span></h3>
+      <div class="map-table"><table id="map-raw"></table></div>
+      <h3 class="section-title">Parsed entries <span class="muted small" id="map-count"></span></h3>
+      <div class="map-table"><table id="map-sample"></table></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" data-close="mapping-modal">Cancel</button>
+      <button class="btn btn-primary" id="mapping-apply" disabled>Import entries</button>
+    </div>
+  </div>
+</div>
+
+<!-- Upload / read progress -->
+<div class="modal-overlay" id="progress-modal">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="prog-title">
+    <div class="modal-head"><div><h3 id="prog-title">Uploading statement</h3><div class="muted small" id="prog-file"></div></div></div>
+    <div class="modal-body">
+      <div class="prog-stage" id="prog-stage" aria-live="polite">Starting…</div>
+      <div class="prog-track" role="progressbar" aria-labelledby="prog-stage" aria-valuemin="0" aria-valuemax="100"><div class="prog-bar indeterminate" id="prog-bar"></div></div>
+      <div class="muted small" id="prog-detail"></div>
+      <div class="help" style="margin-top:10px">Large PDFs are read page by page and can take a minute. You can cancel at any time.</div>
+    </div>
+    <div class="modal-foot"><button type="button" class="btn btn-ghost" id="prog-cancel">Cancel</button></div>
+  </div>
+</div>
+
+<!-- Which bank ledger -->
+<div class="modal-overlay" id="bank-modal">
+  <form class="modal" id="bank-form" novalidate>
+    <div class="modal-head">
+      <div><h3>Which bank account is this statement for?</h3><div class="muted small" id="bank-file"></div></div>
+      <button type="button" class="icon-btn" data-close="bank-modal" data-icon="x" aria-label="Close"></button>
+    </div>
+    <div class="modal-body">
+      <dl class="facts" id="bank-facts"></dl>
+      <div class="field" style="margin-bottom:10px">
+        <label for="bank-choice">Bank ledger in Tally</label>
+        <select id="bank-choice" required></select>
+        <div class="help" id="bank-reason"></div>
+      </div>
+      <label class="check" for="bank-show-all"><input type="checkbox" id="bank-show-all"> Show all ledgers, not only bank accounts</label>
+      <div class="alert alert-warning small hidden" id="bank-empty" style="margin-top:12px">
+        No bank ledgers found for this company. Create one on the <a href="ledgers.html">Ledgers</a> page (under Bank Accounts) and fetch again, or show all ledgers.</div>
+    </div>
+    <div class="modal-foot">
+      <button type="button" class="btn btn-ghost" data-close="bank-modal">Cancel</button>
+      <button type="submit" class="btn btn-primary" id="bank-continue">Continue</button>
+    </div>
+  </form>
+</div>
+
+<!-- Password for a protected statement -->
+<div class="modal-overlay" id="password-modal">
+  <form class="modal" id="password-form" autocomplete="off" novalidate>
+    <div class="modal-head">
+      <div><h3>Password-protected statement</h3><div class="muted small" id="pw-file"></div></div>
+      <button type="button" class="icon-btn" data-close="password-modal" data-icon="x" aria-label="Close"></button>
+    </div>
+    <div class="modal-body confirm-body">
+      <div class="confirm-icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17 9h-1V7a4 4 0 0 0-8 0v2H7a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2zm-7-2a2 2 0 0 1 4 0v2h-4zm2 11a2 2 0 1 1 0-4 2 2 0 0 1 0 4z"/></svg></div>
+      <div style="flex:1">
+        <p style="margin:0 0 12px">This file is locked. Enter the password to open it.</p>
+        <label for="pw-input" class="small" style="font-weight:700">Password</label>
+        <div class="input-group" style="margin-top:6px">
+          <input type="password" id="pw-input" autocomplete="off" spellcheck="false">
+          <button type="button" class="btn btn-outline" id="pw-toggle">Show</button>
+        </div>
+        <div class="row-error hidden" id="pw-error" role="alert"></div>
+        <div class="help" style="margin-top:8px">Banks often use your customer ID, date of birth (e.g. DDMMYYYY) or PAN, as given in the statement email. The password is used only to open this file and is not saved.</div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button type="button" class="btn btn-ghost" data-close="password-modal">Cancel</button>
+      <button type="submit" class="btn btn-primary" id="pw-unlock">Unlock</button>
+    </div>
+  </form>
+</div>
+
+<!-- Edit entry -->
+<div class="modal-overlay" id="entry-modal">
+  <form class="modal" id="entry-form" novalidate>
+    <div class="modal-head"><h3>Edit entry</h3><button type="button" class="icon-btn" data-close="entry-modal" data-icon="x" aria-label="Close"></button></div>
+    <div class="modal-body">
+      <div class="field" style="margin-bottom:14px"><label for="e-date">Date</label><input type="date" id="e-date" required></div>
+      <div class="field" style="margin-bottom:14px"><label for="e-narration">Narration</label><input type="text" id="e-narration"></div>
+      <div class="field" style="margin-bottom:14px"><label for="e-ref">Ref / Chq no.</label><input type="text" id="e-ref"></div>
+      <div class="row">
+        <div class="field"><label for="e-debit">Withdrawal</label><input type="number" step="0.01" min="0" id="e-debit"></div>
+        <div class="field"><label for="e-credit">Deposit</label><input type="number" step="0.01" min="0" id="e-credit"></div>
+      </div>
+      <div class="row-error hidden" id="e-error"></div>
+    </div>
+    <div class="modal-foot">
+      <button type="button" class="btn btn-ghost" data-close="entry-modal">Cancel</button>
+      <button type="submit" class="btn btn-primary" id="entry-save">Save</button>
+    </div>
+  </form>
+</div>
+
+<!-- Create a ledger that is missing in Tally -->
+<div class="modal-overlay" id="create-ledger-modal">
+  <form class="modal" id="create-ledger-form" novalidate>
+    <div class="modal-head">
+      <div><h3>Create ledger in Tally</h3><div class="muted small" id="cl-context"></div></div>
+      <button type="button" class="icon-btn" data-close="create-ledger-modal" data-icon="x" aria-label="Close"></button>
+    </div>
+    <div class="modal-body">
+      <div class="field" style="margin-bottom:14px"><label for="cl-name">Ledger name</label><input type="text" id="cl-name" required autocomplete="off"></div>
+      <div class="field" style="margin-bottom:14px">
+        <label for="cl-parent">Group (under)</label>
+        <input type="text" id="cl-parent" list="cl-group-list" required placeholder="e.g. Indirect Expenses, Sundry Creditors" autocomplete="off">
+        <datalist id="cl-group-list"></datalist>
+      </div>
+      <div class="field" style="margin-bottom:14px">
+        <label for="cl-opening">Opening balance</label>
+        <input type="number" id="cl-opening" step="0.01" value="0">
+        <div class="help">Negative = Debit, positive = Credit (Tally convention).</div>
+      </div>
+      <label class="check hidden" id="cl-apply-all-wrap" for="cl-apply-all" style="margin-bottom:12px"><input type="checkbox" id="cl-apply-all" checked> <span id="cl-apply-all-label"></span></label>
+      <div class="alert alert-error small hidden" id="cl-error" style="margin-bottom:12px"></div>
+      <div class="alert alert-info small" style="margin:0">The ledger is created in Tally Prime immediately and added to the ledger list.</div>
+    </div>
+    <div class="modal-foot">
+      <button type="button" class="btn btn-ghost" data-close="create-ledger-modal">Cancel</button>
+      <button type="submit" class="btn btn-primary" id="cl-save">Create &amp; use</button>
+    </div>
+  </form>
+</div>
+
+<!-- Bulk voucher type -->
+<div class="modal-overlay" id="vtype-modal">
+  <form class="modal" id="vtype-form" novalidate>
+    <div class="modal-head">
+      <div><h3>Set voucher type for selected rows</h3><div class="muted small" id="vtype-sub"></div></div>
+      <button type="button" class="icon-btn" data-close="vtype-modal" data-icon="x" aria-label="Close"></button>
+    </div>
+    <div class="modal-body">
+      <div class="choice-list" role="radiogroup" aria-label="Voucher type">
+        <label class="choice"><input type="radio" name="vtype" value="auto" checked><span><b>Auto: match each row's ledger</b><span class="muted small">Contra for cash/bank ledgers, otherwise Payment for withdrawals and Receipt for deposits</span></span></label>
+        <label class="choice"><input type="radio" name="vtype" value="Payment"><span><b>Payment</b><span class="muted small">Money out of the bank to a party or expense ledger</span></span></label>
+        <label class="choice"><input type="radio" name="vtype" value="Receipt"><span><b>Receipt</b><span class="muted small">Money into the bank from a party or income ledger</span></span></label>
+        <label class="choice"><input type="radio" name="vtype" value="Contra"><span><b>Contra</b><span class="muted small">Transfers with cash or another bank account</span></span></label>
+      </div>
+      <div class="alert alert-warning small hidden" id="vtype-warn" style="margin-top:12px"></div>
+    </div>
+    <div class="modal-foot">
+      <button type="button" class="btn btn-ghost" data-close="vtype-modal">Cancel</button>
+      <button type="submit" class="btn btn-primary" id="vtype-apply">Apply</button>
+    </div>
+  </form>
+</div>
+
+<!-- Bulk ledger -->
+<div class="modal-overlay" id="fill-modal">
+  <form class="modal" id="fill-form" novalidate>
+    <div class="modal-head">
+      <div><h3>Set ledger for selected rows</h3><div class="muted small" id="fill-sub"></div></div>
+      <button type="button" class="icon-btn" data-close="fill-modal" data-icon="x" aria-label="Close"></button>
+    </div>
+    <div class="modal-body">
+      <div class="field" style="margin-bottom:0">
+        <label for="fill-ledger">Ledger</label>
+        <input type="text" id="fill-ledger" list="ledger-list" required autocomplete="off" placeholder="Pick a ledger, or type a new name to create it">
+        <div class="help" id="fill-hint" aria-live="polite"></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button type="button" class="btn btn-ghost" data-close="fill-modal">Cancel</button>
+      <button type="submit" class="btn btn-primary" id="fill-apply">Apply</button>
+    </div>
+  </form>
+</div>
+
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+<script src="assets/js/tally.js"></script>
+<script src="assets/js/reader.js"></script>
+<script>
+  var tenant = App.renderShell({ active: "statement", title: "Import Statement" });
+  var $ = function (id) { return document.getElementById(id); };
+  var canEdit = App.can("statement", "edit"), canPush = App.can("statement", "create");
+
+  var SAMPLE_CSV = "HDFC BANK LTD - Statement of Account\nAccount No: XXXXXXXX4521   Period: 01/10/2026 to 06/10/2026\n\nDate,Narration,Chq./Ref.No.,Withdrawal Amt.,Deposit Amt.,Closing Balance\n" +
+    "01/10/2026,NEFT CR-LAKSHMI STORES-INV PAYMENT,N2741001,,48500.00,345000.00\n" +
+    "02/10/2026,ATM WDL-ANNA NAGAR CHENNAI,ATM88121,10000.00,,335000.00\n" +
+    "03/10/2026,IMPS-APEX SUPPLIERS-PUR BILL 4106,IM558120,36200.00,,298800.00\n" +
+    "04/10/2026,TNEB ELECTRICITY BILL AUTOPAY,BD9912,8420.00,,290380.00\n" +
+    "05/10/2026,NEFT DR-OFFICE RENT OCT,N2741190,30000.00,,260380.00\n" +
+    "05/10/2026,UPI-SHARMA ENTERPRISES-9876@okhdfc,UPI71230,,22000.00,282380.00\n" +
+    "06/10/2026,SMS ALERT CHARGES QTR,CHG001,59.00,,282321.00\n" +
+    "06/10/2026,AMAZON SELLER SERVICES SETTLEMENT,AMZ44102,,61250.40,343571.40\n" +
+    "06/10/2026,INT CREDIT SB A/C,INT0926,,1240.00,344811.40\n" +
+    "06/10/2026,UPI-RAVI KUMAR-ravi@ybl,UPI71299,2500.00,,342311.40\n";
+
+  // Keyword → ledger, used when a narration doesn't name a ledger directly.
+  var RULES = [
+    [/rent/i, "Office Rent"], [/salary|payroll/i, "Salaries"], [/electric|tneb|bescom|power/i, "Electricity Charges"],
+    [/charge|fee/i, "Bank Charges"], [/int(erest)? ?cr(edit)?/i, "Interest Received"],
+    [/amazon/i, "Amazon Seller Services"], [/flipkart/i, "Flipkart Internet Pvt Ltd"], [/atm|cash wdl|cash dep|self/i, "Cash"]
+  ];
+
+  var upload = null;           // { file, rows, text, facts, bank, password, header, map }
+  var currentId = null;        // import under review
+  var selected = {};           // entry id → true
+  var statusFilter = "all";
+  var cancelRead = false;
+
+  /* =====================================================
+     Header & steps
+     ===================================================== */
+  function syncHeader() {
+    $("formatChip").textContent = Tally.format().toUpperCase();
+    var last = Tally.lastResponse();
+    $("last-response-btn").disabled = !last;
+    $("last-response-btn").title = last ? "Show the last request sent to Tally" : "No Tally request yet";
+  }
+  $("last-response-btn").addEventListener("click", function () {
+    var last = Tally.lastResponse();
+    if (last) App.showResponse(last.title, last.sub, last.body);
+  });
+  function setStep(n) {
+    [1, 2, 3].forEach(function (i) {
+      var el = $("step-" + i);
+      el.classList.toggle("active", i === n);
+      el.classList.toggle("done", i < n);
+      el.querySelector(".n").innerHTML = i < n ? "&#10003;" : i;
+    });
+  }
+
+  /* =====================================================
+     Step 1: company & ledger cache
+     ===================================================== */
+  $("company").innerHTML = '<option value="">Select a company…</option>' + Tally.companies().map(function (c) { return "<option>" + App.esc(c) + "</option>"; }).join("");
+  if (Tally.companies().length === 1) $("company").value = Tally.companies()[0];
+  else $("company").value = Tally.companies()[0];
+
+  function company() { return $("company").value; }
+  function cache() { return company() ? Tally.cached(company()) : null; }
+  function ledgerNames() { var c = cache(); return c ? c.ledgers.map(function (l) { return l.name; }) : []; }
+
+  function syncCompany() {
+    var c = company(), ch = cache(), st = $("ledger-status");
+    $("tally-alert").classList.toggle("hidden", Tally.reachable());
+    $("tally-alert").innerHTML = "Tally Prime isn't reachable at " + App.esc(Tally.address()) + ". You can still review imports, but fetching ledgers and pushing need Tally." + (App.can("settings", "view") ? ' <a class="btn btn-sm btn-outline" href="settings.html">Open Settings</a>' : "");
+    if (!c) { st.innerHTML = ""; }
+    else if (ch) {
+      st.innerHTML = '<div class="alert alert-success small">' + App.icon("checkCircle") + "<span><b>" + ch.ledgers.length + " ledgers</b> cached for " + App.esc(c) + " · fetched " + App.ago(ch.fetchedAt) + '</span><button type="button" class="btn btn-sm btn-outline" id="refresh-ledgers">' + App.icon("refresh") + "Refresh</button></div>";
+    } else {
+      st.innerHTML = '<div class="alert alert-warning small">' + App.icon("alert") + "<span>Ledgers for <b>" + App.esc(c) + "</b> haven't been fetched yet. They're needed to choose the bank and match ledgers.</span>" +
+        '<button type="button" class="btn btn-sm btn-primary" id="refresh-ledgers">' + App.icon("refresh") + "Fetch from Tally</button></div>";
+    }
+    st.querySelectorAll("svg").forEach(function (s) { s.setAttribute("width", "16"); s.setAttribute("height", "16"); });
+    var rb = $("refresh-ledgers");
+    if (rb) rb.addEventListener("click", function () {
+      rb.disabled = true; rb.lastChild.textContent = "Fetching…";
+      Tally.fetchLedgers(c).then(function (x) { App.toast(x.ledgers.length + " ledgers fetched."); })
+        .catch(function (err) { App.toast(err.message, "bad"); })
+        .then(function () { syncHeader(); syncCompany(); });
+    });
+    $("dropzone").classList.toggle("disabled", !c || !ch);
+    $("upload-btn").disabled = !upload || !upload.file || !c || !ch;
+    $("ledger-list").innerHTML = ledgerNames().map(function (n) { return '<option value="' + App.esc(n) + '">'; }).join("");
+    setStep(!c ? 1 : currentId ? 3 : 2);
+  }
+  $("company").addEventListener("change", syncCompany);
+  document.addEventListener("tally:status", function () { if (!currentId) syncCompany(); });
+
+  /* =====================================================
+     Step 2: choose file → read → bank → map columns
+     ===================================================== */
+  function chooseFile(file) {
+    upload = { file: file };
+    $("file-label").textContent = "Selected file";
+    $("file-chosen").textContent = file.name + " · " + Math.max(1, Math.round(file.size / 1024)) + " KB";
+    $("file-chosen").classList.remove("hidden");
+    syncCompany();
+  }
+  $("file").addEventListener("change", function () { if (this.files[0]) chooseFile(this.files[0]); this.value = ""; });
+  ["dragenter", "dragover"].forEach(function (ev) { $("dropzone").addEventListener(ev, function (e) { e.preventDefault(); $("dropzone").classList.add("drag"); }); });
+  ["dragleave", "drop"].forEach(function (ev) { $("dropzone").addEventListener(ev, function (e) { e.preventDefault(); $("dropzone").classList.remove("drag"); }); });
+  $("dropzone").addEventListener("drop", function (e) { if (e.dataTransfer.files[0]) chooseFile(e.dataTransfer.files[0]); });
+  $("sample-link").addEventListener("click", function (e) {
+    e.preventDefault();
+    chooseFile(new File([SAMPLE_CSV], "HDFC_Statement_Oct2026.csv", { type: "text/csv" }));
+  });
+
+  $("upload-btn").addEventListener("click", function () { startRead(null); });
+
+  function startRead(password) {
+    if (!upload || !upload.file) return;
+    cancelRead = false;
+    $("prog-file").textContent = upload.file.name;
+    $("prog-stage").textContent = "Starting…";
+    $("prog-detail").textContent = "";
+    $("prog-bar").className = "prog-bar indeterminate"; $("prog-bar").style.width = "";
+    App.openModal("progress-modal");
+    Reader.read(upload.file, {
+      password: password,
+      isCancelled: function () { return cancelRead; },
+      onProgress: function (msg, frac) {
+        $("prog-stage").textContent = msg;
+        if (frac == null) { $("prog-bar").className = "prog-bar indeterminate"; $("prog-bar").style.width = ""; }
+        else { $("prog-bar").className = "prog-bar"; $("prog-bar").style.width = Math.round(frac * 100) + "%"; }
+      }
+    }).then(function (res) {
+      App.closeModal("progress-modal");
+      App.closeModal("password-modal");
+      upload.rows = res.rows; upload.text = res.text; upload.kind = res.kind; upload.pages = res.pages; upload.sheet = res.sheet;
+      upload.facts = Reader.facts(res.text);
+      upload.header = Reader.detectHeader(res.rows);
+      upload.map = Reader.guessMapping(res.rows[upload.header] || []);
+      openBankModal();
+    }).catch(function (err) {
+      App.closeModal("progress-modal");
+      if (err.code === "CANCELLED") { App.toast("Upload cancelled.", "info"); return; }
+      if (err.code === "PASSWORD" || err.code === "BAD_PASSWORD") {
+        $("pw-file").textContent = upload.file.name;
+        $("pw-error").textContent = err.code === "BAD_PASSWORD" ? "That password didn't work. Check it and try again." : "";
+        $("pw-error").classList.toggle("hidden", err.code !== "BAD_PASSWORD");
+        if (err.code === "PASSWORD") $("pw-input").value = "";
+        App.openModal("password-modal");
+        setTimeout(function () { $("pw-input").focus(); $("pw-input").select(); }, 50);
+        return;
+      }
+      App.toast(err.message, "bad");
+    });
+  }
+  $("prog-cancel").addEventListener("click", function () { cancelRead = true; App.closeModal("progress-modal"); });
+
+  $("pw-toggle").addEventListener("click", function () {
+    var show = $("pw-input").type === "password";
+    $("pw-input").type = show ? "text" : "password";
+    this.textContent = show ? "Hide" : "Show";
+  });
+  $("password-form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var pw = $("pw-input").value;
+    if (!pw) { $("pw-error").textContent = "Enter the password."; $("pw-error").classList.remove("hidden"); return; }
+    App.closeModal("password-modal");
+    startRead(pw);
+  });
+
+  /* ---------- bank ---------- */
+  function openBankModal() {
+    var f = upload.facts;
+    $("bank-file").textContent = upload.file.name;
+    var facts = [["File", upload.file.name], ["Rows read", upload.rows.length + (upload.pages ? " from " + upload.pages + " page" + (upload.pages > 1 ? "s" : "") : upload.sheet ? " from sheet “" + upload.sheet + "”" : "")]];
+    if (f.bank) facts.push(["Bank in file", f.bank]);
+    if (f.account) facts.push(["Account", f.account]);
+    if (f.period) facts.push(["Period", f.period]);
+    $("bank-facts").innerHTML = facts.map(function (x) { return "<dt>" + x[0] + "</dt><dd>" + App.esc(x[1]) + "</dd>"; }).join("");
+    var suggestion = Tally.suggestBank(company(), upload.text + " " + upload.file.name);
+    fillBankChoices(suggestion ? suggestion.name : (upload.bank || ""));
+    $("bank-reason").textContent = suggestion ? suggestion.reason : "";
+    App.openModal("bank-modal");
+  }
+  function fillBankChoices(selectedName) {
+    var all = $("bank-show-all").checked, ch = cache();
+    var bankGroups = App.groupsUnder("Bank Accounts");
+    var list = (ch ? ch.ledgers : []).filter(function (l) { return all || bankGroups.indexOf(l.parent) !== -1; });
+    $("bank-choice").innerHTML = list.map(function (l) { return '<option value="' + App.esc(l.name) + '"' + (l.name === selectedName ? " selected" : "") + ">" + App.esc(l.name) + (all ? " (" + App.esc(l.parent) + ")" : "") + "</option>"; }).join("");
+    $("bank-empty").classList.toggle("hidden", list.length > 0);
+    $("bank-continue").disabled = !list.length;
+  }
+  $("bank-show-all").addEventListener("change", function () { fillBankChoices($("bank-choice").value); });
+  $("bank-form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    if (!$("bank-choice").value) return;
+    upload.bank = $("bank-choice").value;
+    App.closeModal("bank-modal");
+    openMapping();
+  });
+
+  /* ---------- column mapping ---------- */
+  var FIELDS = [
+    ["date", "Date", true], ["narration", "Narration", true], ["ref", "Ref / Chq no.", false],
+    ["debit", "Withdrawal", false], ["credit", "Deposit", false], ["amount", "Amount (single column)", false],
+    ["drcr", "Dr / Cr indicator", false], ["balance", "Balance", false]
+  ];
+  var MONTHS = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 };
+
+  function parseDate(s) {
+    s = String(s || "").trim();
+    var m = /^(\d{1,2})[\/\-. ](\d{1,2})[\/\-. ](\d{2,4})$/.exec(s);
+    if (m) { var y = m[3].length === 2 ? "20" + m[3] : m[3]; return valid(y, m[2], m[1]); }
+    m = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(s);
+    if (m) return valid(m[1], m[2], m[3]);
+    m = /^(\d{1,2})[\-\/ ]([A-Za-z]{3})[A-Za-z]*[\-\/ ,]*(\d{2,4})$/.exec(s);
+    if (m && MONTHS[m[2].toLowerCase()]) { var yy = m[3].length === 2 ? "20" + m[3] : m[3]; return valid(yy, MONTHS[m[2].toLowerCase()], m[1]); }
+    return null;
+    function valid(y, mo, d) {
+      mo = Number(mo); d = Number(d);
+      if (mo < 1 || mo > 12 || d < 1 || d > 31) return null;
+      return y + "-" + String(mo).padStart(2, "0") + "-" + String(d).padStart(2, "0");
+    }
+  }
+  function parseAmount(s) {
+    s = String(s || "").trim();
+    if (!s || s === "-") return 0;
+    var neg = /^\(.*\)$/.test(s) || /^-/.test(s);
+    var n = Number(s.replace(/[^0-9.]/g, ""));
+    return isNaN(n) ? 0 : (neg ? -n : n);
+  }
+
+  function parseEntries() {
+    var map = upload.map, out = [], skipped = 0;
+    upload.rows.slice(upload.header + 1).forEach(function (r) {
+      var cell = function (k) { return map[k] != null ? r[map[k]] || "" : ""; };
+      var date = parseDate(cell("date"));
+      var debit = 0, credit = 0;
+      if (map.debit != null || map.credit != null) { debit = Math.abs(parseAmount(cell("debit"))); credit = Math.abs(parseAmount(cell("credit"))); }
+      else if (map.amount != null) {
+        var amt = parseAmount(cell("amount")), ind = cell("drcr");
+        if (map.drcr != null && ind) { if (/^(dr|d|debit|withdraw)/i.test(ind)) debit = Math.abs(amt); else credit = Math.abs(amt); }
+        else if (amt < 0) debit = -amt; else credit = amt;
+      }
+      if (!date || (!debit && !credit)) { skipped++; return; }
+      out.push({ date: date, narration: cell("narration"), ref: cell("ref"), debit: Math.round(debit * 100) / 100, credit: Math.round(credit * 100) / 100, balance: cell("balance") });
+    });
+    return { entries: out, skipped: skipped };
+  }
+
+  function openMapping() {
+    $("map-sub").textContent = upload.file.name;
+    $("map-bank").textContent = upload.bank;
+    $("map-header-row").innerHTML = upload.rows.slice(0, 40).map(function (r, i) {
+      return '<option value="' + i + '">Row ' + (i + 1) + ": " + App.esc(r.filter(Boolean).slice(0, 4).join(" · ").slice(0, 70)) + "</option>";
+    }).join("");
+    $("map-header-row").value = upload.header;
+    renderMapping();
+    App.openModal("mapping-modal");
+  }
+
+  function renderMapping(withSpinner) {
+    var header = upload.rows[upload.header] || [];
+    var opts = function (val) {
+      return '<option value="">— Not in file —</option>' + header.map(function (h, i) { return '<option value="' + i + '"' + (Number(val) === i && val !== undefined && val !== null ? " selected" : "") + ">" + App.esc(h || "Column " + (i + 1)) + "</option>"; }).join("");
+    };
+    $("map-fields").innerHTML = FIELDS.map(function (f) {
+      return '<div class="field"><label for="map-' + f[0] + '">' + f[1] + (f[2] ? ' <span class="req">*</span>' : "") + '</label><select id="map-' + f[0] + '" data-field="' + f[0] + '">' + opts(upload.map[f[0]]) + "</select></div>";
+    }).join("");
+
+    // Raw preview
+    var width = Math.max.apply(null, upload.rows.slice(0, 40).map(function (r) { return r.length; }).concat([1]));
+    var shown = upload.rows.slice(0, 40);
+    $("map-raw").innerHTML = "<thead><tr><th>#</th>" + Array.from({ length: width }, function (_, i) { return "<th>" + (header[i] ? App.esc(header[i]) : "Col " + (i + 1)) + "</th>"; }).join("") + "</tr></thead><tbody>" +
+      shown.map(function (r, i) {
+        return '<tr data-row="' + i + '" class="' + (i === upload.header ? "header-row" : i < upload.header ? "above" : "") + '"><td class="rn">' + (i + 1) + "</td>" + Array.from({ length: width }, function (_, j) { return "<td>" + App.esc(r[j] || "") + "</td>"; }).join("") + "</tr>";
+      }).join("") + "</tbody>";
+    $("map-raw-note").textContent = upload.rows.length > 40 ? "showing 40 of " + upload.rows.length + " rows" : upload.rows.length + " rows";
+
+    // Parsed preview + validation
+    var res = parseEntries(), m = upload.map;
+    var problems = [];
+    if (m.date == null) problems.push("Choose the <b>Date</b> column.");
+    if (m.narration == null) problems.push("Choose the <b>Narration</b> column.");
+    if (m.debit == null && m.credit == null && m.amount == null) problems.push("Choose <b>Withdrawal</b> and <b>Deposit</b> columns, or a single <b>Amount</b> column.");
+    var alert = "";
+    if (problems.length) alert = '<div class="alert alert-warning small" style="margin-bottom:12px">' + problems.join(" ") + "</div>";
+    else if (!res.entries.length) alert = '<div class="alert alert-error small" style="margin-bottom:12px">No transactions could be read with these columns. Check the header row and the Date column.</div>';
+    else if (res.skipped) alert = '<div class="alert alert-info small" style="margin-bottom:12px">' + res.skipped + " row" + (res.skipped > 1 ? "s" : "") + " below the header had no readable date or amount (e.g. opening balance, totals) and will be skipped.</div>";
+    $("map-alert").innerHTML = alert;
+    $("map-count").textContent = res.entries.length + " entr" + (res.entries.length === 1 ? "y" : "ies") + (res.entries.length > 25 ? " · first 25 shown" : "");
+    $("map-sample").innerHTML = "<thead><tr><th>Date</th><th>Narration</th><th>Ref</th><th class='num'>Withdrawal</th><th class='num'>Deposit</th><th class='num'>Balance</th></tr></thead><tbody>" +
+      (res.entries.slice(0, 25).map(function (e) {
+        return "<tr><td>" + App.date(e.date) + "</td><td>" + App.esc(e.narration) + "</td><td>" + App.esc(e.ref) + '</td><td class="num">' + (e.debit ? App.inr(e.debit) : "") + '</td><td class="num">' + (e.credit ? App.inr(e.credit) : "") + '</td><td class="num">' + App.esc(e.balance) + "</td></tr>";
+      }).join("") || '<tr><td colspan="6" class="muted">Nothing to show yet.</td></tr>') + "</tbody>";
+    $("mapping-apply").disabled = !!problems.length || !res.entries.length;
+    $("mapping-apply").textContent = res.entries.length ? "Import " + res.entries.length + " entries" : "Import entries";
+
+    if (withSpinner) {
+      $("map-loading").classList.remove("hidden");
+      setTimeout(function () { $("map-loading").classList.add("hidden"); }, 250);
+    }
+  }
+
+  $("map-header-row").addEventListener("change", function () {
+    upload.header = Number(this.value);
+    upload.map = Reader.guessMapping(upload.rows[upload.header] || []);
+    renderMapping(true);
+  });
+  $("map-raw").addEventListener("click", function (e) {
+    var tr = e.target.closest("tr[data-row]");
+    if (!tr) return;
+    upload.header = Number(tr.dataset.row);
+    $("map-header-row").value = upload.header;
+    upload.map = Reader.guessMapping(upload.rows[upload.header] || []);
+    renderMapping(true);
+  });
+  $("map-fields").addEventListener("change", function (e) {
+    var f = e.target.dataset.field;
+    if (!f) return;
+    if (e.target.value === "") delete upload.map[f]; else upload.map[f] = Number(e.target.value);
+    renderMapping(true);
+  });
+  $("map-change-bank").addEventListener("click", function (e) {
+    e.preventDefault();
+    App.closeModal("mapping-modal");
+    openBankModal();
+  });
+
+  $("mapping-apply").addEventListener("click", function () {
+    var res = parseEntries();
+    var names = ledgerNames();
+    var entries = res.entries.map(function (e) {
+      var ledger = suggestLedger(e.narration, names);
+      return { id: Data.uid(), date: e.date, narration: e.narration, ref: e.ref, debit: e.debit, credit: e.credit, ledger: ledger, vtype: autoVtype(ledger, e), status: "pending" };
+    });
+    var imp = Data.add("stmtImports", { file: upload.file.name, company: company(), bank: upload.bank, uploadedAt: new Date().toISOString(), entries: entries });
+    App.closeModal("mapping-modal");
+    var matched = entries.filter(function (e) { return e.ledger; }).length;
+    App.toast(entries.length + " entries imported · " + matched + " matched to a ledger.");
+    resetUpload();
+    openImport(imp.id);
+  });
+
+  function resetUpload() {
+    upload = null;
+    $("file-label").textContent = "Drop the bank statement here, or click to choose";
+    $("file-chosen").classList.add("hidden");
+  }
+
+  /* =====================================================
+     Ledger suggestions & voucher types
+     ===================================================== */
+  function suggestLedger(narr, names) {
+    var n = String(narr || "").toLowerCase();
+    var bank = upload ? upload.bank : null;
+    var byName = names.filter(function (x) { return x.length > 3 && x !== bank && n.indexOf(x.toLowerCase()) !== -1; })[0];
+    if (byName) return byName;
+    for (var i = 0; i < RULES.length; i++) if (RULES[i][0].test(narr) && names.indexOf(RULES[i][1]) !== -1) return RULES[i][1];
+    return "";
+  }
+  function isCashBank(ledger) {
+    var c = cache(), l = c && c.ledgers.filter(function (x) { return x.name === ledger; })[0];
+    return !!l && Tally.isCashOrBankGroup(l.parent);
+  }
+  function autoVtype(ledger, e) {
+    if (ledger && isCashBank(ledger)) return "Contra";
+    return e.debit ? "Payment" : "Receipt";
+  }
+
+  /* =====================================================
+     Previous imports
+     ===================================================== */
+  var importsPg = App.pager("importsPager", renderImports);
+  function renderImports() {
+    var list = Data.list("stmtImports").slice().sort(function (a, b) { return a.uploadedAt.localeCompare(b.uploadedAt); });
+    var numbered = list.map(function (imp, i) { return { imp: imp, n: i + 1 }; }).reverse();
+    var page = importsPg.slice(numbered);
+    $("imports").innerHTML = page.length ? page.map(function (x) {
+      var imp = x.imp, s = Tally.importStats(imp);
+      return '<tr><td class="mono">' + x.n + '</td><td class="cell-strong">' + App.esc(imp.file) + "</td><td>" + App.esc(imp.company) + "</td><td>" + App.esc(imp.bank) + '</td><td style="white-space:nowrap">' + App.dateTime(imp.uploadedAt) + "</td>" +
+        '<td class="num">' + s.total + '</td><td class="num">' + s.pending + '</td><td class="num">' + s.validated + '</td><td class="num">' + s.pushed + '</td><td class="num">' + (s.failed ? '<b style="color:var(--bad)">' + s.failed + "</b>" : 0) + "</td>" +
+        '<td><span class="badge badge-' + s.tone + '">' + s.label + "</span></td>" +
+        '<td><div class="row-actions"><button class="btn btn-outline btn-xs" data-open="' + imp.id + '">Open</button>' +
+        '<button class="btn btn-danger btn-xs" data-perm="delete" data-del="' + imp.id + '" title="Delete import">' + App.icon("trash") + "</button></div></td></tr>";
+    }).join("") : '<tr><td colspan="12"><div class="empty-state">' + App.icon("folder") + "<strong>No imports yet</strong>Upload a bank statement above.</div></td></tr>";
+  }
+  $("imports").addEventListener("click", function (e) {
+    var b = e.target.closest("button");
+    if (!b) return;
+    if (b.dataset.open) openImport(b.dataset.open);
+    if (b.dataset.del) {
+      var imp = Data.get("stmtImports", b.dataset.del), s = Tally.importStats(imp);
+      App.confirm({ title: "Delete this import?", message: "Remove “" + imp.file + "” and its " + s.total + " entries from FebiTally?", detail: s.pushed ? s.pushed + " entries already pushed stay in Tally — only the import record is removed." : "Nothing has been pushed to Tally from this import.", ok: "Delete", danger: true })
+        .then(function (ok) { if (!ok) return; Data.remove("stmtImports", imp.id); App.toast("Import deleted."); renderImports(); });
+    }
+  });
+
+  /* =====================================================
+     Step 3: review
+     ===================================================== */
+  function imp() { return currentId ? Data.get("stmtImports", currentId) : null; }
+  function saveEntries(entries) { Data.update("stmtImports", currentId, { entries: entries }); }
+
+  function openImport(id) {
+    currentId = id;
+    selected = {};
+    statusFilter = "all";
+    var i = imp();
+    if (!i) { currentId = null; return; }
+    if (Tally.companies().indexOf(i.company) !== -1) $("company").value = i.company;
+    syncCompany();
+    $("setup").classList.add("hidden");
+    $("review").classList.remove("hidden");
+    $("new-import-btn").classList.remove("hidden");
+    $("filters").querySelectorAll("button").forEach(function (b) { b.classList.toggle("active", b.dataset.filter === "all"); });
+    clearFilters(true);
+    entriesPg.reset();
+    setStep(3);
+    renderReview();
+    history.replaceState(null, "", "import.html?open=" + encodeURIComponent(id));
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+  function closeImport() {
+    currentId = null;
+    $("review").classList.add("hidden");
+    $("setup").classList.remove("hidden");
+    $("new-import-btn").classList.add("hidden");
+    history.replaceState(null, "", "import.html");
+    syncCompany();
+    renderImports();
+  }
+  $("new-import-btn").addEventListener("click", closeImport);
+
+  /* ---------- filters ---------- */
+  function filterState() {
+    return {
+      q: $("entry-search").value.trim().toLowerCase(), from: $("f-from").value, to: $("f-to").value, dir: $("f-dir").value,
+      vtype: $("f-vtype").value, mode: $("f-ledger-mode").value, ledger: $("f-ledger").value.trim(),
+      min: $("f-min").value === "" ? null : Number($("f-min").value), max: $("f-max").value === "" ? null : Number($("f-max").value)
+    };
+  }
+  function passes(e, f, names, ignoreStatus) {
+    if (!ignoreStatus && statusFilter !== "all" && e.status !== statusFilter) return false;
+    if (f.q && (e.narration + " " + e.ledger + " " + e.ref).toLowerCase().indexOf(f.q) === -1) return false;
+    if (f.from && e.date < f.from) return false;
+    if (f.to && e.date > f.to) return false;
+    if (f.dir === "out" && !e.debit) return false;
+    if (f.dir === "in" && !e.credit) return false;
+    if (f.vtype && e.vtype !== f.vtype) return false;
+    if (f.mode === "unset" && e.ledger) return false;
+    if (f.mode === "missing" && (!e.ledger || names.indexOf(e.ledger) !== -1)) return false;
+    if (f.mode === "is" && f.ledger && e.ledger !== f.ledger) return false;
+    var amt = e.debit || e.credit;
+    if (f.min != null && amt < f.min) return false;
+    if (f.max != null && amt > f.max) return false;
+    return true;
+  }
+  function chipsFor(f) {
+    var c = [];
+    if (f.from) c.push(["from", "From " + App.date(f.from)]);
+    if (f.to) c.push(["to", "To " + App.date(f.to)]);
+    if (f.dir) c.push(["dir", f.dir === "out" ? "Withdrawals only" : "Deposits only"]);
+    if (f.vtype) c.push(["vtype", f.vtype]);
+    if (f.mode === "unset") c.push(["mode", "Ledger not set"]);
+    if (f.mode === "missing") c.push(["mode", "Ledger not in Tally"]);
+    if (f.mode === "is" && f.ledger) c.push(["mode", "Ledger: " + f.ledger]);
+    if (f.min != null) c.push(["min", "≥ " + App.inr0(f.min)]);
+    if (f.max != null) c.push(["max", "≤ " + App.inr0(f.max)]);
+    return c;
+  }
+  function clearFilters(silent) {
+    ["f-from", "f-to", "f-dir", "f-vtype", "f-ledger-mode", "f-ledger", "f-min", "f-max", "entry-search"].forEach(function (id) { $(id).value = ""; });
+    $("f-ledger").classList.add("hidden");
+    if (!silent) { entriesPg.reset(); renderReview(); }
+  }
+  $("filter-clear").addEventListener("click", function () { clearFilters(false); });
+  $("filter-toggle").addEventListener("click", function () {
+    var open = $("filter-panel").classList.toggle("hidden") === false;
+    this.setAttribute("aria-expanded", open);
+  });
+  $("f-ledger-mode").addEventListener("change", function () { $("f-ledger").classList.toggle("hidden", this.value !== "is"); });
+  ["f-from", "f-to", "f-dir", "f-vtype", "f-ledger-mode", "f-ledger", "f-min", "f-max", "entry-search"].forEach(function (id) {
+    $(id).addEventListener("input", function () { entriesPg.reset(); renderReview(); });
+  });
+  $("filter-chips").addEventListener("click", function (e) {
+    var b = e.target.closest("[data-chip]");
+    if (!b) return;
+    var k = b.dataset.chip;
+    if (k === "mode") { $("f-ledger-mode").value = ""; $("f-ledger").value = ""; $("f-ledger").classList.add("hidden"); }
+    else $("f-" + k).value = "";
+    entriesPg.reset(); renderReview();
+  });
+  $("filters").addEventListener("click", function (e) {
+    var b = e.target.closest("button");
+    if (!b) return;
+    statusFilter = b.dataset.filter;
+    $("filters").querySelectorAll("button").forEach(function (x) { x.classList.toggle("active", x === b); });
+    entriesPg.reset(); renderReview();
+  });
+
+  /* ---------- table ---------- */
+  var entriesPg = App.pager("entriesPager", renderReview, { size: 25 });
+  function shortDate(d) { return new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short" }); }
+  var STATUS_LABEL = { pending: "Pending", validated: "Validated", failed: "Failed", pushed: "Pushed", skipped: "Skipped" };
+
+  function renderReview() {
+    var i = imp();
+    if (!i) return;
+    var names = ledgerNames(), f = filterState(), s = Tally.importStats(i);
+    $("review-title").textContent = i.file;
+    $("review-sub").textContent = i.company + " · " + i.bank + " · uploaded " + App.dateTime(i.uploadedAt) + " · " + s.total + " entries";
+    $("filters").querySelectorAll("button").forEach(function (b) {
+      var k = b.dataset.filter;
+      b.querySelector(".c").textContent = k === "all" ? s.total : s[k];
+    });
+
+    // Rows matching everything except the status pill (for the summary) and including it (for the table).
+    var visible = i.entries.filter(function (e) { return passes(e, f, names, false); });
+    var chips = chipsFor(f);
+    var active = chips.length + (f.q ? 1 : 0);
+    $("filter-count").textContent = chips.length;
+    $("filter-count").classList.toggle("hidden", !chips.length);
+    $("filter-bar").classList.toggle("hidden", !active && statusFilter === "all");
+    $("filter-chips").innerHTML = chips.map(function (c) { return '<span class="chip">' + App.esc(c[1]) + '<button type="button" data-chip="' + c[0] + '" aria-label="Remove filter">&times;</button></span>'; }).join("") +
+      (f.q ? '<span class="chip">“' + App.esc(f.q) + '”</span>' : "");
+    $("filter-summary").textContent = "Showing " + visible.length + " of " + s.total;
+
+    var page = entriesPg.slice(visible);
+    var editable = function (e) { return canEdit && e.status !== "pushed"; };
+    $("entries").innerHTML = page.length ? page.map(function (e) {
+      var missing = e.ledger && names.indexOf(e.ledger) === -1;
+      var vopts = (e.debit ? ["Payment", "Contra"] : ["Receipt", "Contra"]).map(function (v) { return "<option" + (v === e.vtype ? " selected" : "") + ">" + v + "</option>"; }).join("");
+      return '<tr data-id="' + e.id + '" class="is-' + e.status + '">' +
+        '<td class="chk">' + (e.status === "pushed" ? "" : '<input type="checkbox" class="row-check"' + (selected[e.id] ? " checked" : "") + ' aria-label="Select row">') + "</td>" +
+        '<td style="white-space:nowrap" title="' + App.date(e.date) + '">' + shortDate(e.date) + "</td>" +
+        '<td class="narr-cell"><span class="' + (editable(e) ? "entry-narr" : "") + '" title="' + (editable(e) ? "Click to edit" : "") + '">' + App.esc(e.narration || "—") + "</span>" + (e.ref ? '<span class="cell-sub mono ref-sub">' + App.esc(e.ref) + "</span>" : "") + "</td>" +
+        '<td class="mono ref-col" style="font-size:12px;white-space:nowrap">' + App.esc(e.ref || "") + "</td>" +
+        '<td class="num" style="color:var(--bad)">' + (e.debit ? App.inr(e.debit) : "") + '</td><td class="num" style="color:var(--good)">' + (e.credit ? App.inr(e.credit) : "") + "</td>" +
+        '<td><div class="entry-ledger' + (missing ? " missing" : "") + '">' +
+          (editable(e) ? '<input type="text" class="ledger-input" list="ledger-list" value="' + App.esc(e.ledger) + '" placeholder="Choose ledger…" autocomplete="off">' : '<span class="cell-strong">' + App.esc(e.ledger || "—") + "</span>") +
+          (missing && editable(e) ? '<span class="miss">Not in Tally · <a href="#" data-create>create it</a></span>' : "") +
+        "</div></td>" +
+        "<td>" + (editable(e) ? '<select class="vtype-select">' + vopts + "</select>" : App.esc(e.vtype)) + "</td>" +
+        '<td class="status-cell"><span class="badge status-' + e.status + '">' + STATUS_LABEL[e.status] + "</span>" +
+          (e.status === "failed" && e.error ? '<div class="row-error">' + App.esc(e.error) + "</div>" : "") +
+          (e.status === "pushed" && e.voucherNumber ? '<span class="cell-sub mono">' + App.esc(e.voucherNumber) + "</span>" : "") + "</td>" +
+        '<td><div class="row-actions">' +
+          (canEdit && (e.status === "pending" || e.status === "failed") ? '<button class="btn btn-outline btn-xs" data-act="validate" title="Validate this entry" aria-label="Validate">' + App.icon("check") + "</button>" : "") +
+          (canEdit && e.status !== "pushed" && e.status !== "skipped" ? '<button class="btn btn-ghost btn-xs" data-act="skip" title="Skip this entry" aria-label="Skip">' + App.icon("x") + "</button>" : "") +
+          (canEdit && e.status === "skipped" ? '<button class="btn btn-ghost btn-xs" data-act="restore" title="Restore this entry" aria-label="Restore">' + App.icon("refresh") + "</button>" : "") +
+          (editable(e) ? '<button class="btn btn-ghost btn-xs" data-act="edit" title="Edit entry">' + App.icon("edit") + "</button>" : "") +
+        "</div></td></tr>";
+    }).join("") : '<tr><td colspan="10"><div class="empty-state">' + App.icon("folder") + "<strong>No entries match</strong>Change the filters to see other rows.</div></td></tr>";
+
+    var pageIds = page.filter(function (e) { return e.status !== "pushed"; }).map(function (e) { return e.id; });
+    $("check-all").checked = pageIds.length > 0 && pageIds.every(function (id) { return selected[id]; });
+    $("check-all").disabled = !pageIds.length;
+
+    var tot = visible.reduce(function (t, e) { t.out += e.debit || 0; t.in += e.credit || 0; return t; }, { out: 0, in: 0 });
+    $("totals").innerHTML = "<span><b>" + visible.length + "</b> entries</span><span>Withdrawals <b>" + App.inr(tot.out) + "</b></span><span>Deposits <b>" + App.inr(tot.in) + "</b></span><span>Net <b>" + App.inr(tot.in - tot.out) + "</b></span>";
+
+    syncBulk();
+    $("push-btn").disabled = !s.validated || !canPush;
+    $("push-btn").lastChild.textContent = s.validated ? "Push " + s.validated + " validated to Tally" : "Push validated to Tally";
+    $("validate-btn").lastChild.textContent = selectedIds().length ? "Validate " + selectedIds().length + " selected" : "Validate all pending";
+  }
+
+  function selectedIds() {
+    var i = imp();
+    return i ? i.entries.filter(function (e) { return selected[e.id] && e.status !== "pushed"; }).map(function (e) { return e.id; }) : [];
+  }
+  function syncBulk() {
+    var n = selectedIds().length;
+    $("bulk-bar").classList.toggle("hidden", !n);
+    $("bulk-count").textContent = n + " selected";
+    $("validate-btn").lastChild.textContent = n ? "Validate " + n + " selected" : "Validate all pending";
+  }
+
+  /* ---------- row editing ---------- */
+  function updateEntry(id, patch, keepStatus) {
+    var i = imp();
+    i.entries.forEach(function (e) {
+      if (e.id !== id) return;
+      Object.assign(e, patch);
+      if (!keepStatus && (e.status === "validated" || e.status === "failed")) { e.status = "pending"; delete e.error; }
+    });
+    saveEntries(i.entries);
+  }
+  function findEntry(id) { return imp().entries.filter(function (e) { return e.id === id; })[0]; }
+
+  $("entries").addEventListener("change", function (e) {
+    var tr = e.target.closest("tr[data-id]");
+    if (!tr) return;
+    var id = tr.dataset.id;
+    if (e.target.classList.contains("row-check")) { if (e.target.checked) selected[id] = true; else delete selected[id]; syncBulk(); return; }
+    if (e.target.classList.contains("ledger-input")) {
+      var en = findEntry(id), name = e.target.value.trim();
+      if (name === en.ledger) return;
+      updateEntry(id, { ledger: name, vtype: autoVtype(name, en) });
+      renderReview();
+      focusLedger(id);
+    }
+    if (e.target.classList.contains("vtype-select")) { updateEntry(id, { vtype: e.target.value }); renderReview(); }
+  });
+
+  function focusLedger(id) {
+    var tr = $("entries").querySelector('tr[data-id="' + id + '"] .ledger-input');
+    if (tr) { tr.focus(); tr.setSelectionRange(tr.value.length, tr.value.length); }
+  }
+
+  // Tab jumps to the next row's ledger; Enter on an unknown name opens "Create ledger".
+  $("entries").addEventListener("keydown", function (e) {
+    if (!e.target.classList.contains("ledger-input")) return;
+    var inputs = Array.prototype.slice.call($("entries").querySelectorAll(".ledger-input"));
+    var idx = inputs.indexOf(e.target);
+    if (e.key === "Tab") {
+      var next = inputs[idx + (e.shiftKey ? -1 : 1)];
+      if (next) { e.preventDefault(); e.target.dispatchEvent(new Event("change", { bubbles: true })); var nid = next.closest("tr").dataset.id; setTimeout(function () { focusLedger(nid); }, 0); }
+    }
+    if (e.key === "Enter") {
+      e.preventDefault();
+      var id = e.target.closest("tr").dataset.id, name = e.target.value.trim();
+      if (name && ledgerNames().indexOf(name) === -1) openCreateLedger(name, [id]);
+      else {
+        e.target.dispatchEvent(new Event("change", { bubbles: true }));
+        var nx = inputs[idx + 1];
+        if (nx) { var nid2 = nx.closest("tr").dataset.id; setTimeout(function () { focusLedger(nid2); }, 0); }
+      }
+    }
+  });
+
+  $("entries").addEventListener("click", function (e) {
+    var tr = e.target.closest("tr[data-id]");
+    if (!tr) return;
+    var id = tr.dataset.id;
+    if (e.target.closest("[data-create]")) { e.preventDefault(); openCreateLedger(findEntry(id).ledger, [id]); return; }
+    if (e.target.closest(".entry-narr")) { openEntry(id); return; }
+    var b = e.target.closest("[data-act]");
+    if (!b) return;
+    var act = b.dataset.act;
+    if (act === "validate") { validate([id]); }
+    if (act === "skip") { updateEntry(id, { status: "skipped" }, true); renderReview(); }
+    if (act === "restore") { updateEntry(id, { status: "pending" }, true); renderReview(); }
+    if (act === "edit") openEntry(id);
+  });
+
+  $("check-all").addEventListener("change", function () {
+    var on = this.checked;
+    $("entries").querySelectorAll("tr[data-id]").forEach(function (tr) {
+      var cb = tr.querySelector(".row-check");
+      if (!cb) return;
+      cb.checked = on;
+      if (on) selected[tr.dataset.id] = true; else delete selected[tr.dataset.id];
+    });
+    syncBulk();
+  });
+  $("clear-selection").addEventListener("click", function () { selected = {}; renderReview(); });
+
+  /* ---------- validation ---------- */
+  function checkEntry(e, names) {
+    if (!e.ledger) return "Choose a ledger.";
+    if (names.indexOf(e.ledger) === -1) return "Ledger “" + e.ledger + "” is not in Tally. Create it or pick another ledger.";
+    var i = imp();
+    if (e.ledger === i.bank) return "The ledger can't be the bank account itself.";
+    var cb = isCashBank(e.ledger);
+    if (e.vtype === "Contra" && !cb) return "Contra needs a cash or bank ledger. Use " + (e.debit ? "Payment" : "Receipt") + " instead.";
+    if (e.vtype !== "Contra" && cb) return "“" + e.ledger + "” is a cash/bank ledger — use Contra.";
+    if (e.vtype === "Payment" && !e.debit) return "Payment needs a withdrawal amount.";
+    if (e.vtype === "Receipt" && !e.credit) return "Receipt needs a deposit amount.";
+    if (!(e.debit || e.credit)) return "Amount is zero.";
+    return null;
+  }
+  function validate(ids) {
+    var i = imp(), names = ledgerNames(), ok = 0, bad = 0;
+    i.entries.forEach(function (e) {
+      if (ids.indexOf(e.id) === -1 || e.status === "pushed" || e.status === "skipped") return;
+      var err = checkEntry(e, names);
+      if (err) { e.status = "failed"; e.error = err; bad++; }
+      else { e.status = "validated"; delete e.error; ok++; }
+    });
+    saveEntries(i.entries);
+    renderReview();
+    if (ok + bad) App.toast(ok + " validated" + (bad ? ", " + bad + " need attention" : "") + ".", bad ? "info" : "good");
+    else App.toast("Nothing to validate.", "info");
+  }
+  $("validate-btn").addEventListener("click", function () {
+    var ids = selectedIds();
+    if (!ids.length) ids = imp().entries.filter(function (e) { return e.status === "pending" || e.status === "failed"; }).map(function (e) { return e.id; });
+    validate(ids);
+    selected = {};
+    renderReview();
+  });
+
+  /* ---------- push ---------- */
+  function busy(on, title, sub) {
+    $("busy").classList.toggle("hidden", !on);
+    if (title) $("busy-title").textContent = title;
+    $("busy-sub").textContent = sub || "";
+  }
+  $("push-btn").addEventListener("click", function () {
+    var i = imp(), list = i.entries.filter(function (e) { return e.status === "validated"; });
+    if (!list.length) return;
+    App.confirm({ title: "Push to Tally Prime?", message: "Create " + list.length + " voucher" + (list.length > 1 ? "s" : "") + " in “" + i.company + "” against " + i.bank + "?", detail: "Vouchers are written to Tally immediately.", ok: "Push " + list.length })
+      .then(function (ok) {
+        if (!ok) return;
+        busy(true, "Pushing to Tally…", "0 of " + list.length);
+        Tally.push(i.company, i.bank, list, function (done, total) { $("busy-sub").textContent = done + " of " + total; })
+          .then(function (results) {
+            var cur = imp(), pushed = 0, failed = 0, stamp = new Date().toISOString();
+            results.forEach(function (r) {
+              cur.entries.forEach(function (e) {
+                if (e.id !== r.id) return;
+                if (r.ok) { e.status = "pushed"; e.voucherNumber = r.number; e.pushedAt = stamp; delete e.error; pushed++; }
+                else { e.status = "failed"; e.error = r.error; failed++; }
+              });
+            });
+            saveEntries(cur.entries);
+            App.toast(pushed + " voucher" + (pushed === 1 ? "" : "s") + " created in Tally" + (failed ? ", " + failed + " failed" : "") + ".", failed ? "info" : "good");
+          })
+          .catch(function (err) { App.toast(err.message, "bad"); })
+          .then(function () { busy(false); selected = {}; syncHeader(); renderReview(); });
+      });
+  });
+
+  /* ---------- edit entry ---------- */
+  var editingEntry = null;
+  function openEntry(id) {
+    var e = findEntry(id);
+    if (!e || e.status === "pushed" || !canEdit) return;
+    editingEntry = id;
+    $("e-date").value = e.date; $("e-narration").value = e.narration; $("e-ref").value = e.ref || "";
+    $("e-debit").value = e.debit || ""; $("e-credit").value = e.credit || "";
+    $("e-error").classList.add("hidden");
+    App.openModal("entry-modal");
+  }
+  $("entry-form").addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var d = Number($("e-debit").value) || 0, c = Number($("e-credit").value) || 0;
+    var err = !$("e-date").value ? "Enter a date." : (d && c) ? "Enter either a withdrawal or a deposit, not both." : (!d && !c) ? "Enter an amount." : null;
+    if (err) { $("e-error").textContent = err; $("e-error").classList.remove("hidden"); return; }
+    var e = findEntry(editingEntry);
+    var patch = { date: $("e-date").value, narration: $("e-narration").value.trim(), ref: $("e-ref").value.trim(), debit: d, credit: c };
+    if (!!d !== !!e.debit) patch.vtype = autoVtype(e.ledger, patch);
+    updateEntry(editingEntry, patch);
+    App.closeModal("entry-modal");
+    App.toast("Entry updated.");
+    renderReview();
+  });
+
+  /* ---------- create missing ledger ---------- */
+  var createFor = [];
+  $("cl-group-list").innerHTML = Data.list("groups").map(function (g) { return '<option value="' + App.esc(g.name) + '">'; }).join("");
+  function openCreateLedger(name, ids) {
+    var i = imp(), first = i.entries.filter(function (e) { return e.id === ids[0]; })[0];
+    // Other rows that already carry the same (missing) ledger name.
+    var same = i.entries.filter(function (e) { return ids.indexOf(e.id) === -1 && e.status !== "pushed" && e.ledger && e.ledger.toLowerCase() === String(name).toLowerCase(); }).map(function (e) { return e.id; });
+    createFor = { ids: ids, same: same };
+    $("cl-context").textContent = ids.length > 1 ? ids.length + " selected rows" : (first ? App.date(first.date) + " · " + first.narration : "");
+    $("cl-name").value = name || "";
+    $("cl-parent").value = first && first.credit ? "Sundry Debtors" : "Indirect Expenses";
+    $("cl-opening").value = 0;
+    $("cl-apply-all-wrap").classList.toggle("hidden", !same.length);
+    $("cl-apply-all-label").textContent = "Also use it for " + same.length + " other row" + (same.length > 1 ? "s" : "") + " with “" + name + "”";
+    $("cl-error").classList.add("hidden");
+    App.openModal("create-ledger-modal");
+    setTimeout(function () { $("cl-name").focus(); }, 50);
+  }
+  $("create-ledger-form").addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var input = { name: $("cl-name").value, parent: $("cl-parent").value, opening: Number($("cl-opening").value) || 0 };
+    var btn = $("cl-save");
+    btn.disabled = true; btn.textContent = "Creating…";
+    Tally.createLedger(imp().company, input).then(function (l) {
+      var ids = createFor.ids.concat($("cl-apply-all").checked ? createFor.same : []);
+      var i = imp();
+      i.entries.forEach(function (e) {
+        if (ids.indexOf(e.id) === -1) return;
+        e.ledger = l.name; e.vtype = autoVtype(l.name, e);
+        if (e.status === "failed" || e.status === "validated") { e.status = "pending"; delete e.error; }
+      });
+      saveEntries(i.entries);
+      App.closeModal("create-ledger-modal");
+      App.closeModal("fill-modal");
+      App.toast("Ledger “" + l.name + "” created in Tally and used for " + ids.length + " row" + (ids.length > 1 ? "s" : "") + ".");
+      syncCompany(); renderReview(); syncHeader();
+    }).catch(function (err) {
+      $("cl-error").textContent = err.message; $("cl-error").classList.remove("hidden");
+    }).then(function () { btn.disabled = false; btn.innerHTML = "Create &amp; use"; });
+  });
+
+  /* ---------- bulk: ledger, voucher type, skip ---------- */
+  $("fill-btn").addEventListener("click", function () {
+    var n = selectedIds().length;
+    $("fill-sub").textContent = n + " row" + (n > 1 ? "s" : "") + " selected";
+    $("fill-ledger").value = "";
+    $("fill-hint").textContent = "";
+    App.openModal("fill-modal");
+    setTimeout(function () { $("fill-ledger").focus(); }, 50);
+  });
+  $("fill-ledger").addEventListener("input", function () {
+    var v = this.value.trim();
+    $("fill-hint").textContent = !v ? "" : ledgerNames().indexOf(v) !== -1 ? "✓ In Tally" : "Not in Tally — you'll be asked to create it.";
+  });
+  $("fill-form").addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var name = $("fill-ledger").value.trim(), ids = selectedIds();
+    if (!name) return;
+    if (ledgerNames().indexOf(name) === -1) { App.closeModal("fill-modal"); openCreateLedger(name, ids); return; }
+    var i = imp();
+    i.entries.forEach(function (e) {
+      if (ids.indexOf(e.id) === -1) return;
+      e.ledger = name; e.vtype = autoVtype(name, e);
+      if (e.status === "failed" || e.status === "validated") { e.status = "pending"; delete e.error; }
+    });
+    saveEntries(i.entries);
+    App.closeModal("fill-modal");
+    App.toast("Ledger set for " + ids.length + " row" + (ids.length > 1 ? "s" : "") + ".");
+    renderReview();
+  });
+
+  $("vtype-btn").addEventListener("click", function () {
+    var n = selectedIds().length;
+    $("vtype-sub").textContent = n + " row" + (n > 1 ? "s" : "") + " selected";
+    document.querySelector('input[name="vtype"][value="auto"]').checked = true;
+    $("vtype-warn").classList.add("hidden");
+    App.openModal("vtype-modal");
+  });
+  $("vtype-form").addEventListener("change", function () {
+    var v = document.querySelector('input[name="vtype"]:checked').value, ids = selectedIds();
+    var clash = imp().entries.filter(function (e) { return ids.indexOf(e.id) !== -1 && ((v === "Payment" && !e.debit) || (v === "Receipt" && !e.credit)); }).length;
+    $("vtype-warn").textContent = clash ? clash + " selected row" + (clash > 1 ? "s are" : " is") + " the wrong direction for " + v + " and will be left unchanged." : "";
+    $("vtype-warn").classList.toggle("hidden", !clash);
+  });
+  $("vtype-form").addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var v = document.querySelector('input[name="vtype"]:checked').value, ids = selectedIds(), changed = 0;
+    var i = imp();
+    i.entries.forEach(function (e) {
+      if (ids.indexOf(e.id) === -1) return;
+      var nv = v === "auto" ? autoVtype(e.ledger, e) : v;
+      if ((nv === "Payment" && !e.debit) || (nv === "Receipt" && !e.credit)) return;
+      if (e.vtype !== nv) { e.vtype = nv; changed++; if (e.status === "validated" || e.status === "failed") { e.status = "pending"; delete e.error; } }
+    });
+    saveEntries(i.entries);
+    App.closeModal("vtype-modal");
+    App.toast("Voucher type updated on " + changed + " row" + (changed === 1 ? "" : "s") + ".");
+    renderReview();
+  });
+
+  $("skip-btn").addEventListener("click", function () {
+    var ids = selectedIds(), i = imp();
+    i.entries.forEach(function (e) { if (ids.indexOf(e.id) !== -1) { e.status = "skipped"; delete e.error; } });
+    saveEntries(i.entries);
+    selected = {};
+    App.toast(ids.length + " row" + (ids.length > 1 ? "s" : "") + " skipped.");
+    renderReview();
+  });
+
+  /* =====================================================
+     Start
+     ===================================================== */
+  syncHeader();
+  syncCompany();
+  renderImports();
+  var openId = new URLSearchParams(location.search).get("open");
+  if (openId && Data.get("stmtImports", openId)) openImport(openId);
+</script>
+</body>
+</html>

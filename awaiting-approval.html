@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Awaiting Approval · Tally Suite</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body class="state-page">
+
+<div class="state-card">
+  <div class="state-head">
+    <span class="state-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/></svg></span>
+    <div><div class="entry-kicker">Under review</div><h1>Awaiting approval</h1></div>
+  </div>
+  <div class="state-body">
+    <p>Your company isn't active yet. The platform administrator is reviewing it.</p>
+
+    <div class="ticket" id="tenantTicket" style="display:none">
+      <div class="ticket-label">Company ID</div>
+      <div class="ticket-value" id="tenantIdValue" style="margin-bottom:0"></div>
+    </div>
+
+    <ul class="timeline">
+      <li class="done"><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span><strong>Registered</strong>Company details and email verified.</li>
+      <li class="now"><span class="dot"></span><strong>Under review</strong>The admin checks your company and GST details. This usually takes 24–48 hours.</li>
+      <li><span class="dot"></span><strong>Approved</strong>You'll get an email, and then you can sign in.</li>
+    </ul>
+
+    <div class="stack">
+      <button type="button" class="btn btn-primary entry-submit" id="backBtn" style="margin-top:0">Back to sign in</button>
+      <button type="button" class="btn btn-ghost btn-sm" id="simulateBtn" style="display:none">Demo only: approve this company now</button>
+    </div>
+  </div>
+</div>
+
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+  var pendingId = sessionStorage.getItem("tally_pending_tenant");
+  if (pendingId) {
+    document.getElementById("tenantTicket").style.display = "";
+    document.getElementById("tenantIdValue").textContent = pendingId;
+    document.getElementById("simulateBtn").style.display = "inline-flex";
+  }
+
+  document.getElementById("backBtn").addEventListener("click", function () {
+    sessionStorage.removeItem("tally_pending_tenant");
+    window.location.href = "index.html";
+  });
+
+  // There is no platform-admin console in this UI, so this button stands in for the approval step.
+  document.getElementById("simulateBtn").addEventListener("click", function () {
+    Data.setTenantStatus(pendingId, "Active");
+    sessionStorage.removeItem("tally_pending_tenant");
+    App.toast(pendingId + " approved. You can sign in now.");
+    setTimeout(function () { window.location.href = "index.html"; }, 1200);
+  });
+</script>
+</body>
+</html>

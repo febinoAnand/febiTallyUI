@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Contra &amp; Journal · Tally Suite</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+<style>
+  .transfer { display: grid; grid-template-columns: 1fr auto 1fr; gap: 14px; align-items: center; margin: 4px 0 20px; }
+  .transfer-box { border: 1px solid var(--border-strong); border-radius: 8px; padding: 14px 16px; background: var(--surface-2); }
+  .transfer-box .tb-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 8px; }
+  .transfer-box select { width: 100%; height: 40px; border: 1px solid var(--border-strong); border-radius: 7px; background: var(--surface); color: var(--text); font: 600 13.5px var(--font); padding: 0 10px; outline: none; }
+  .transfer-box .tb-bal { font-size: 12px; color: var(--muted); margin-top: 6px; font-family: var(--mono); }
+  .transfer-arrow { width: 46px; height: 46px; border-radius: 50%; background: var(--brand-deep); color: #fbbf24; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 4px var(--accent-soft); cursor: pointer; transition: transform .3s; border: 0; }
+  .transfer-arrow:hover { transform: rotate(180deg); }
+  .transfer-arrow svg { width: 20px; height: 20px; }
+  @media (max-width: 640px) { .transfer { grid-template-columns: 1fr; } .transfer-arrow { margin: 0 auto; transform: rotate(90deg); } }
+</style>
+</head>
+<body>
+<div class="layout">
+  <aside id="sidebar"></aside>
+  <div class="main">
+    <header id="topbar"></header>
+    <main class="content">
+
+      <div class="page-head">
+        <h1>Contra &amp; Journal</h1>
+        <div class="segmented" id="typeTabs">
+          <button class="active" data-type="Contra"><span data-icon="contra"></span>Contra <kbd class="mono" style="font-size:10px;opacity:.6">F4</kbd></button>
+          <button data-type="Journal"><span data-icon="ledger"></span>Journal <kbd class="mono" style="font-size:10px;opacity:.6">F7</kbd></button>
+        </div>
+      </div>
+
+      <div>
+        <!-- Contra form -->
+        <form class="card" id="contraForm" novalidate data-perm="create">
+          <div class="card-head">
+            <div class="card-title"><span class="ct-icon" data-icon="contra"></span><div>Contra Transaction<small>Cash deposit, withdrawal or bank-to-bank transfer</small></div></div>
+            <span class="badge badge-brand plain mono" id="cNumber"></span>
+          </div>
+          <div class="card-body">
+            <div class="transfer">
+              <div class="transfer-box"><div class="tb-label">From (Cr)</div><select id="cFrom"></select><div class="tb-bal" id="cFromBal"></div></div>
+              <button type="button" class="transfer-arrow" id="swapBtn" title="Swap">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+              </button>
+              <div class="transfer-box"><div class="tb-label">To (Dr)</div><select id="cTo"></select><div class="tb-bal" id="cToBal"></div></div>
+            </div>
+            <div class="alert-bar" id="cAlert"><span data-icon="alert"></span><span>From and To must be different accounts.</span></div>
+            <div class="field-grid cols-3">
+              <div class="field">
+                <label for="cDate">Date <span class="req">*</span></label>
+                <input type="date" id="cDate">
+              </div>
+              <div class="field">
+                <label for="cAmount">Amount (₹) <span class="req">*</span></label>
+                <input type="number" id="cAmount" min="0" step="0.01" placeholder="0.00" style="font-family:var(--mono);font-weight:700">
+                <span class="err-msg" id="errCAmount">Enter an amount greater than zero.</span>
+              </div>
+              <div class="field">
+                <label for="cRef">Reference / Slip No.</label>
+                <input type="text" id="cRef" placeholder="Optional">
+              </div>
+              <div class="field full">
+                <label for="cNarration">Narration</label>
+                <input type="text" id="cNarration" placeholder="Being cash deposited into bank">
+              </div>
+            </div>
+            <div class="badge badge-info plain" id="contraKind" style="margin-top:14px"></div>
+          </div>
+          <div class="card-foot">
+            <button type="button" class="btn btn-ghost" id="cReset">Clear</button>
+            <button type="submit" class="btn btn-primary"><span data-icon="check"></span>Save Contra</button>
+          </div>
+        </form>
+
+        <!-- Journal form -->
+        <form class="card hidden" id="journalForm" novalidate data-perm="create">
+          <div class="card-head">
+            <div class="card-title"><span class="ct-icon" data-icon="ledger"></span><div>Journal Transaction<small>Debits must equal credits</small></div></div>
+            <span class="badge badge-brand plain mono" id="jNumber"></span>
+          </div>
+          <div class="card-body">
+            <div class="field-grid" style="margin-bottom:16px">
+              <div class="field">
+                <label for="jDate">Date <span class="req">*</span></label>
+                <input type="date" id="jDate">
+              </div>
+              <div class="field">
+                <label for="jTemplate">Quick template</label>
+                <select id="jTemplate">
+                  <option value="">— None —</option>
+                  <option value="dep">Depreciation</option>
+                  <option value="sal">Salary provision</option>
+                  <option value="int">Interest accrued</option>
+                  <option value="bad">Bad debts written off</option>
+                </select>
+              </div>
+            </div>
+            <div class="table-wrap" style="margin:0 -20px;border-top:1px solid var(--border)">
+              <table class="table stack-sm">
+                <thead><tr><th style="width:88px">Dr/Cr</th><th>Ledger</th><th class="num" style="width:150px">Debit</th><th class="num" style="width:150px">Credit</th><th style="width:44px"></th></tr></thead>
+                <tbody id="jLines"></tbody>
+                <tfoot><tr><td></td><td>Total</td><td class="num" id="jDr">₹0.00</td><td class="num" id="jCr">₹0.00</td><td></td></tr></tfoot>
+              </table>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap">
+              <button type="button" class="btn btn-ghost btn-sm" id="jAdd"><span data-icon="plus"></span>Add / balance line</button>
+              <span class="balance-indicator" id="jBalance"></span>
+            </div>
+            <div class="field" style="margin-top:16px">
+              <label for="jNarration">Narration</label>
+              <input type="text" id="jNarration" placeholder="Being…">
+            </div>
+          </div>
+          <div class="card-foot">
+            <button type="button" class="btn btn-ghost" id="jReset">Clear</button>
+            <button type="submit" class="btn btn-primary" id="jSubmit"><span data-icon="check"></span>Save Journal</button>
+          </div>
+        </form>
+
+      </div>
+
+      <div class="card mt">
+        <div class="card-head">
+          <div class="card-title"><span class="ct-icon" data-icon="ledger"></span><div id="regTitle">Register</div></div>
+          <div class="search-box"><span data-icon="search"></span><input type="text" id="regSearch" placeholder="Search…"></div>
+        </div>
+        <div class="table-wrap">
+          <table class="table stack-sm">
+            <thead><tr><th>Transaction No.</th><th>Date</th><th>Particulars (Dr / Cr)</th><th>Narration</th><th class="num">Amount</th><th></th></tr></thead>
+            <tbody id="regBody"></tbody>
+          </table>
+        </div>
+          <div id="regPager"></div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+<script src="assets/js/tally.js"></script>
+<script>
+  App.renderShell({ active: "contrajournal", title: "Contra & Journal", subtitle: "Transactions · Transfers & adjustments" });
+  var $ = function (id) { return document.getElementById(id); };
+  var regPg = App.pager("regPager", renderRegister, { resetOn: ["#typeTabs"] });
+  var type = new URLSearchParams(location.search).get("type") === "Journal" ? "Journal" : "Contra";
+
+  function balText(n) { return App.inr(Math.abs(n)) + " " + (n >= 0 ? "Dr" : "Cr"); }
+
+  function setType(t) {
+    type = t;
+    $("typeTabs").querySelectorAll("button").forEach(function (b) { b.classList.toggle("active", b.dataset.type === t); });
+    $("contraForm").classList.toggle("hidden", t !== "Contra");
+    $("journalForm").classList.toggle("hidden", t !== "Journal");
+    renderRegister();
+  }
+  $("typeTabs").addEventListener("click", function (e) { var b = e.target.closest("button"); if (b) setType(b.dataset.type); });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "F4") { e.preventDefault(); setType("Contra"); }
+    if (e.key === "F7") { e.preventDefault(); setType("Journal"); }
+  });
+
+  /* ---------------- Contra ---------------- */
+  var cb = App.ledgersIn(["Cash-in-Hand", "Bank Accounts"]);
+  function contraReset() {
+    $("cFrom").innerHTML = App.ledgerOptions(cb, "Cash");
+    $("cTo").innerHTML = App.ledgerOptions(cb, "HDFC Bank A/c");
+    $("cDate").value = App.today();
+    $("cAmount").value = ""; $("cRef").value = ""; $("cNarration").value = "";
+    $("cAmount").classList.remove("error"); $("errCAmount").classList.remove("show");
+    $("cNumber").textContent = Data.nextNumber("Contra", $("cDate").value);
+    contraSync();
+  }
+  function contraSync() {
+    var from = App.findLedger($("cFrom").value), to = App.findLedger($("cTo").value);
+    $("cFromBal").textContent = from ? balText(Data.ledgerBalance(from.name)) : "";
+    $("cToBal").textContent = to ? balText(Data.ledgerBalance(to.name)) : "";
+    $("cAlert").classList.toggle("show", !!from && !!to && from.name === to.name);
+    var kind = "";
+    if (from && to && from.name !== to.name) {
+      var fc = from.group === "Cash-in-Hand", tc = to.group === "Cash-in-Hand";
+      kind = fc && !tc ? "Cash deposit into bank" : !fc && tc ? "Cash withdrawal from bank" : !fc && !tc ? "Bank-to-bank transfer" : "Cash-to-cash transfer";
+      $("cNarration").placeholder = "Being " + kind.toLowerCase();
+    }
+    $("contraKind").textContent = kind;
+    $("contraKind").style.display = kind ? "" : "none";
+  }
+  ["cFrom", "cTo"].forEach(function (id) { $(id).addEventListener("change", contraSync); });
+  $("swapBtn").addEventListener("click", function () {
+    var f = $("cFrom").value; $("cFrom").value = $("cTo").value; $("cTo").value = f; contraSync();
+  });
+  $("cReset").addEventListener("click", contraReset);
+  $("contraForm").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var amt = Number($("cAmount").value), from = $("cFrom").value, to = $("cTo").value;
+    var ok = amt > 0;
+    $("cAmount").classList.toggle("error", !ok); $("errCAmount").classList.toggle("show", !ok);
+    if (!ok || from === to) return App.toast("Please fix the contra details.", "bad");
+    var v = Data.addVoucher({
+      type: "Contra", date: $("cDate").value, party: to, account: from, total: amt, ref: $("cRef").value.trim(),
+      narration: $("cNarration").value.trim() || $("cNarration").placeholder,
+      lines: [{ ledger: to, dr: amt, cr: 0 }, { ledger: from, dr: 0, cr: amt }]
+    });
+    App.toast("Contra " + v.number + " saved.");
+    contraReset(); renderRegister();
+  });
+
+  /* ---------------- Journal ---------------- */
+  var allLedgers = Data.list("ledgers");
+  var TEMPLATES = {
+    dep: [["Depreciation", "Dr"], ["Fixed Assets", "Cr"], "Being depreciation charged for the period"],
+    sal: [["Salaries", "Dr"], ["Salary Payable", "Cr"], "Being salary provision for the month"],
+    int: [["Deposits (Asset)", "Dr"], ["Interest Received", "Cr"], "Being interest accrued on deposits"],
+    bad: [["Bad Debts", "Dr"], ["Sundry Debtors", "Cr"], "Being bad debts written off"]
+  };
+
+  function lineHtml(l) {
+    l = l || {};
+    return '<td><select class="j-side"><option' + (l.side === "Cr" ? "" : " selected") + '>Dr</option><option' + (l.side === "Cr" ? " selected" : "") + ">Cr</option></select></td>" +
+      '<td><select class="j-ledger">' + App.ledgerOptions(allLedgers, l.ledger || "", "Select ledger") + "</select></td>" +
+      '<td><input type="number" class="j-dr num" min="0" step="0.01" value="' + (l.dr || "") + '"' + (l.side === "Cr" ? " disabled" : "") + "></td>" +
+      '<td><input type="number" class="j-cr num" min="0" step="0.01" value="' + (l.cr || "") + '"' + (l.side === "Cr" ? "" : " disabled") + "></td>" +
+      '<td><button type="button" class="btn btn-ghost btn-xs j-del">' + App.icon("trash") + "</button></td>";
+  }
+  function addLine(l) {
+    var tr = document.createElement("tr");
+    tr.innerHTML = lineHtml(l);
+    $("jLines").appendChild(tr);
+    jSync();
+  }
+  function readLines() {
+    return Array.prototype.map.call($("jLines").querySelectorAll("tr"), function (tr) {
+      var side = tr.querySelector(".j-side").value;
+      return {
+        ledger: tr.querySelector(".j-ledger").value,
+        dr: side === "Dr" ? Number(tr.querySelector(".j-dr").value) || 0 : 0,
+        cr: side === "Cr" ? Number(tr.querySelector(".j-cr").value) || 0 : 0
+      };
+    });
+  }
+  function jSync() {
+    var lines = readLines();
+    var dr = lines.reduce(function (s, l) { return s + l.dr; }, 0), cr = lines.reduce(function (s, l) { return s + l.cr; }, 0);
+    $("jDr").textContent = App.inr(dr); $("jCr").textContent = App.inr(cr);
+    var diff = Math.round((dr - cr) * 100) / 100, el = $("jBalance");
+    if (dr === 0 && cr === 0) { el.className = "balance-indicator tone-info"; el.innerHTML = App.icon("alert") + "Enter amounts"; }
+    else if (diff === 0) { el.className = "balance-indicator tone-good"; el.innerHTML = App.icon("checkCircle") + "Balanced"; }
+    else { el.className = "balance-indicator tone-bad"; el.innerHTML = App.icon("alert") + "Difference " + App.inr(Math.abs(diff)) + " " + (diff > 0 ? "Dr" : "Cr"); }
+    el.querySelector("svg").style.width = "16px";
+    return diff;
+  }
+  $("jLines").addEventListener("input", jSync);
+  $("jLines").addEventListener("change", function (e) {
+    if (e.target.classList.contains("j-side")) {
+      var tr = e.target.closest("tr"), cr = e.target.value === "Cr";
+      tr.querySelector(".j-dr").disabled = cr; tr.querySelector(".j-cr").disabled = !cr;
+      (cr ? tr.querySelector(".j-dr") : tr.querySelector(".j-cr")).value = "";
+    }
+    jSync();
+  });
+  $("jLines").addEventListener("click", function (e) {
+    var d = e.target.closest(".j-del");
+    if (!d) return;
+    if ($("jLines").querySelectorAll("tr").length <= 2) return App.toast("A journal needs at least two lines.", "info");
+    d.closest("tr").remove(); jSync();
+  });
+  // Fills the balancing amount into an empty opposite-side line if there is one, otherwise adds a line for it.
+  $("jAdd").addEventListener("click", function () {
+    var diff = jSync();
+    if (diff !== 0) {
+      var side = diff > 0 ? "Cr" : "Dr";
+      var empty = Array.prototype.filter.call($("jLines").querySelectorAll("tr"), function (tr) {
+        return tr.querySelector(".j-side").value === side && !Number(tr.querySelector(side === "Cr" ? ".j-cr" : ".j-dr").value);
+      })[0];
+      if (empty) {
+        empty.querySelector(side === "Cr" ? ".j-cr" : ".j-dr").value = Math.abs(diff);
+        jSync();
+        return;
+      }
+    }
+    addLine(diff > 0 ? { side: "Cr", cr: diff } : diff < 0 ? { side: "Dr", dr: -diff } : {});
+  });
+
+  function journalReset() {
+    $("jLines").innerHTML = "";
+    $("jDate").value = App.today();
+    $("jNarration").value = ""; $("jTemplate").value = "";
+    addLine({ side: "Dr" }); addLine({ side: "Cr" });
+    $("jNumber").textContent = Data.nextNumber("Journal", $("jDate").value);
+  }
+  $("jReset").addEventListener("click", journalReset);
+
+  $("jTemplate").addEventListener("change", function () {
+    var t = TEMPLATES[this.value];
+    if (!t) return;
+    var pick = function (nameOrGroup) {
+      var direct = App.findLedger(nameOrGroup);
+      if (direct) return direct.name;
+      var inGroup = App.ledgersIn([nameOrGroup])[0];
+      return inGroup ? inGroup.name : "";
+    };
+    $("jLines").innerHTML = "";
+    addLine({ side: t[0][1], ledger: pick(t[0][0]) });
+    addLine({ side: t[1][1], ledger: pick(t[1][0]) });
+    $("jNarration").value = t[2];
+  });
+
+  $("journalForm").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var lines = readLines().filter(function (l) { return l.ledger && (l.dr || l.cr); });
+    var diff = jSync();
+    if (lines.length < 2) return App.toast("Add at least two lines with a ledger and amount.", "bad");
+    if (diff !== 0) return App.toast("Debit and credit totals must match.", "bad");
+    var total = lines.reduce(function (s, l) { return s + l.dr; }, 0);
+    var firstDr = lines.filter(function (l) { return l.dr; })[0];
+    var v = Data.addVoucher({ type: "Journal", date: $("jDate").value, party: firstDr.ledger, account: "", total: total, narration: $("jNarration").value.trim(), lines: lines });
+    App.toast("Journal " + v.number + " saved.");
+    journalReset(); renderRegister();
+  });
+
+  /* ---------------- Register ---------------- */
+  function renderRegister() {
+    var q = $("regSearch").value.trim().toLowerCase();
+    var rows = Data.list("vouchers").filter(function (v) {
+      return v.type === type && (!q || (v.number + (v.narration || "") + (v.lines || []).map(function (l) { return l.ledger; }).join(" ")).toLowerCase().indexOf(q) !== -1);
+    }).sort(function (a, b) { return b.date.localeCompare(a.date) || b.number.localeCompare(a.number); });
+    $("regTitle").innerHTML = type + " Register<small>" + rows.length + " transactions</small>";
+    var rowsPage = regPg.slice(rows);
+    $("regBody").innerHTML = rowsPage.length ? rowsPage.map(function (v) {
+      var parts = (v.lines || []).map(function (l) {
+        return '<div style="display:flex;gap:8px;align-items:center;font-size:12.5px"><span class="badge ' + (l.dr ? "badge-good" : "badge-bad") + ' plain" style="font-size:10px;padding:1px 7px">' + (l.dr ? "Dr" : "Cr") + "</span>" + App.esc(l.ledger) + '<span class="muted mono" style="margin-left:auto">' + App.inr(l.dr || l.cr) + "</span></div>";
+      }).join("");
+      return '<tr><td class="mono cell-strong">' + v.number + "</td><td>" + App.date(v.date) + '</td><td style="min-width:260px"><div style="display:grid;gap:4px">' + parts + "</div></td>" +
+        '<td class="muted" style="max-width:260px">' + App.esc(v.narration || "—") + '</td><td class="num cell-strong">' + App.inr(v.total) + "</td>" +
+        '<td><div class="row-actions"><button class="btn btn-danger btn-xs" data-perm="delete" data-del="' + v.id + '">' + App.icon("trash") + "</button></div></td></tr>";
+    }).join("") : App.emptyRow(6, "No " + type.toLowerCase() + " transactions", "Add one using the form above.");
+  }
+  $("regSearch").addEventListener("input", renderRegister);
+  $("regBody").addEventListener("click", function (e) {
+    var b = e.target.closest("[data-del]");
+    if (!b) return;
+    App.confirm({ title: "Delete transaction?", message: "Ledger balances will be updated.", ok: "Delete", danger: true }).then(function (ok) {
+      if (!ok) return;
+      Data.remove("vouchers", b.dataset.del);
+      App.toast("Transaction deleted.");
+      renderRegister(); contraSync();
+    });
+  });
+
+  contraReset();
+  journalReset();
+  setType(type);
+</script>
+</body>
+</html>

@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Settings · FebiTally</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<div class="layout">
+  <aside id="sidebar"></aside>
+  <div class="main">
+    <header id="topbar"></header>
+    <main class="content">
+
+      <header class="page-head">
+        <h1>Settings</h1>
+        <div class="page-actions"></div>
+      </header>
+
+      <div class="grid two-col">
+        <div class="card">
+          <div class="card-head"><div class="card-title"><h2 class="h2">Tally Prime connection</h2></div></div>
+          <form class="card-body" id="settings-form" novalidate>
+            <div class="row row-top">
+              <div class="field">
+                <label for="host">Host</label>
+                <input type="text" id="host" placeholder="localhost" required>
+                <div class="help">Machine where Tally Prime is running, e.g. <code>localhost</code> or <code>192.168.1.20</code>.</div>
+                <span class="err-msg" id="errHost">Enter a host name or IP address.</span>
+              </div>
+              <div class="field" style="max-width:160px">
+                <label for="port">Port</label>
+                <input type="number" id="port" min="1" max="65535" placeholder="9000" required>
+                <span class="err-msg" id="errPort">Port must be 1–65535.</span>
+              </div>
+            </div>
+            <div class="field" style="margin-top:16px">
+              <label>Response format</label>
+              <div><div class="filters" id="format-choice" role="radiogroup" aria-label="Response format">
+                <button type="button" data-format="json" role="radio">JSON</button>
+                <button type="button" data-format="xml" role="radio">XML</button>
+              </div></div>
+              <div class="help" id="format-help"></div>
+            </div>
+            <div class="toolbar" style="margin-top:18px">
+              <button type="submit" class="btn btn-primary" id="save-btn" data-perm="edit">Save</button>
+              <button type="button" class="btn btn-outline" id="test-btn">Test connection</button>
+            </div>
+            <div id="test-result" class="hidden" style="margin-top:16px"></div>
+          </form>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><div class="card-title"><h2 class="h2">Enable the Tally HTTP server</h2></div></div>
+          <div class="card-body">
+            <ol class="steps-list">
+              <li>In Tally Prime press <b>F1 (Help)</b> → <b>Settings</b> → <b>Connectivity</b>.</li>
+              <li>Open <b>Client/Server configuration</b>.</li>
+              <li>Set <b>TallyPrime acts as</b> to <b>Both</b> (or Server).</li>
+              <li>Set <b>Port</b> (default 9000), then accept and restart Tally.</li>
+              <li>Open the company you want to work with; the company is chosen on the Import and Ledgers pages.</li>
+            </ol>
+          </div>
+        </div>
+      </div>
+
+      <div class="card mt">
+        <div class="card-head">
+          <div class="card-title"><h2 class="h2">API console</h2></div>
+          <span class="muted small" id="console-sub">Send a raw request to Tally for troubleshooting</span>
+        </div>
+        <div class="card-body">
+          <div class="row row-top" id="raw-json">
+            <div class="field">
+              <label for="raw-headers">Headers (JSON)</label>
+              <textarea id="raw-headers" class="code" rows="9" spellcheck="false"></textarea>
+            </div>
+            <div class="field">
+              <label for="raw-payload">Payload (JSON)</label>
+              <textarea id="raw-payload" class="code" rows="9" spellcheck="false"></textarea>
+            </div>
+          </div>
+          <div class="field hidden" id="raw-xml-wrap">
+            <label for="raw-xml">Request (XML)</label>
+            <textarea id="raw-xml" class="code" rows="16" spellcheck="false"></textarea>
+          </div>
+          <div class="toolbar" style="margin-top:14px">
+            <button class="btn btn-outline" id="raw-btn"><span data-icon="arrowRight"></span>Send request</button>
+            <button class="btn btn-ghost btn-sm" id="raw-reset">Reset example</button>
+          </div>
+          <div class="alert alert-error small hidden" id="raw-error" style="margin-top:14px"></div>
+          <pre class="console hidden" id="raw-out" style="margin-top:14px"></pre>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+<script src="assets/js/tally.js"></script>
+<script>
+  App.renderShell({ active: "settings", title: "Settings" });
+  var $ = function (id) { return document.getElementById(id); };
+  var canEdit = App.can("settings", "edit");
+  var current = Tally.settings();
+  var chosenFormat = current.format;
+
+  $("host").value = current.host;
+  $("port").value = current.port;
+  if (!canEdit) { $("host").disabled = true; $("port").disabled = true; }
+
+  var FORMAT_HELP = {
+    json: "Requests and responses use Tally's JSON API (TallyPrime 4.0 and later).",
+    xml: "Requests and responses use Tally's classic XML envelope — works with every TallyPrime release."
+  };
+  function markFormat() {
+    $("format-choice").querySelectorAll("button").forEach(function (b) {
+      var on = b.dataset.format === chosenFormat;
+      b.classList.toggle("active", on);
+      b.setAttribute("aria-checked", on);
+      b.disabled = !canEdit;
+    });
+    $("format-help").textContent = FORMAT_HELP[chosenFormat];
+    // The console follows the saved format, not the unsaved choice.
+    var saved = Tally.format();
+    $("raw-json").classList.toggle("hidden", saved !== "json");
+    $("raw-xml-wrap").classList.toggle("hidden", saved !== "xml");
+    $("console-sub").textContent = "Send a raw " + saved.toUpperCase() + " request to Tally for troubleshooting";
+  }
+  $("format-choice").addEventListener("click", function (e) {
+    var b = e.target.closest("button");
+    if (!b || !canEdit) return;
+    chosenFormat = b.dataset.format;
+    markFormat();
+  });
+
+  function readForm() {
+    var host = $("host").value.trim(), port = Number($("port").value);
+    var okHost = /^[a-z0-9.-]+$/i.test(host), okPort = port >= 1 && port <= 65535 && Math.floor(port) === port;
+    $("host").classList.toggle("error", !okHost); $("errHost").classList.toggle("show", !okHost);
+    $("port").classList.toggle("error", !okPort); $("errPort").classList.toggle("show", !okPort);
+    return okHost && okPort ? { host: host, port: port, format: chosenFormat } : null;
+  }
+
+  function showTest(st) {
+    var box = $("test-result");
+    box.classList.remove("hidden");
+    if (st.ok) {
+      box.className = "alert alert-success";
+      box.innerHTML = "<div><b>Connected to " + App.esc(st.version) + "</b> at " + App.esc(st.host + ":" + st.port) + "<br><span class='small'>" + st.companies.length + " compan" + (st.companies.length === 1 ? "y" : "ies") + " open: " + st.companies.map(App.esc).join(", ") + "</span></div>";
+    } else {
+      box.className = "alert alert-error";
+      box.textContent = st.error;
+    }
+  }
+
+  $("test-btn").addEventListener("click", function () {
+    var s = readForm();
+    if (!s) return;
+    var btn = this;
+    btn.disabled = true; btn.textContent = "Testing…";
+    Tally.status(s).then(showTest).then(function () { btn.disabled = false; btn.textContent = "Test connection"; });
+  });
+
+  $("settings-form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    if (!canEdit) return;
+    var s = readForm();
+    if (!s) return;
+    var formatChanged = s.format !== Tally.format();
+    Tally.saveSettings(s);
+    App.toast("Settings saved.");
+    markFormat();
+    if (formatChanged) resetConsole();
+    App.refreshTallyStatus();
+  });
+
+  /* ---------------- API console ---------------- */
+  function resetConsole() {
+    var f = Tally.format();
+    var sample = Tally.sampleRequest(f);
+    if (f === "xml") $("raw-xml").value = sample;
+    else { $("raw-headers").value = sample.headers; $("raw-payload").value = sample.payload; }
+    $("raw-out").classList.add("hidden"); $("raw-error").classList.add("hidden");
+  }
+  $("raw-reset").addEventListener("click", resetConsole);
+
+  $("raw-btn").addEventListener("click", function () {
+    var err = $("raw-error"), out = $("raw-out");
+    err.classList.add("hidden");
+    var input;
+    if (Tally.format() === "xml") input = { xml: $("raw-xml").value };
+    else {
+      try { input = { headers: JSON.parse($("raw-headers").value || "{}"), payload: JSON.parse($("raw-payload").value || "{}") }; }
+      catch (ex) { err.textContent = "Invalid JSON: " + ex.message; err.classList.remove("hidden"); return; }
+    }
+    var btn = this;
+    btn.disabled = true;
+    Tally.raw(input).then(function (res) {
+      out.textContent = res.text;
+      out.classList.remove("hidden");
+      if (!res.ok) { err.textContent = "Tally returned an error — see the response below."; err.classList.remove("hidden"); }
+    }).catch(function (ex) {
+      err.textContent = ex.message; err.classList.remove("hidden"); out.classList.add("hidden");
+    }).then(function () { btn.disabled = false; });
+  });
+
+  markFormat();
+  resetConsole();
+</script>
+</body>
+</html>

@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>e-Commerce Import · Tally Suite</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<div class="layout">
+  <aside id="sidebar"></aside>
+  <div class="main">
+    <header id="topbar"></header>
+    <main class="content">
+
+      <div class="page-head">
+        <h1>e-Commerce Import</h1>
+        <div class="page-actions">
+          <button class="btn btn-outline" id="sampleCsvBtn"><span data-icon="download"></span>Sample CSV</button>
+        </div>
+      </div>
+
+      <div class="wizard" data-perm="create">
+        <div class="wizard-step active" data-step="1"><span class="ws-num">1</span>Choose platform &amp; upload</div>
+        <div class="wizard-step" data-step="2"><span class="ws-num">2</span>Review orders</div>
+        <div class="wizard-step" data-step="3"><span class="ws-num">3</span>Posted to books</div>
+      </div>
+
+      <!-- Step 1 -->
+      <section id="step1" data-perm="create">
+        <div class="card">
+          <div class="card-body">
+            <div class="section-label" style="margin-top:0">1 · Marketplace</div>
+            <div class="platform-grid" id="platforms"></div>
+
+            <div class="section-label" style="margin-top:26px">2 · Settlement / order report</div>
+            <div class="field-grid" style="margin-bottom:16px">
+              <div class="field">
+                <label for="partyLedger">Marketplace Ledger</label>
+                <select id="partyLedger"></select>
+                <span class="field-hint">Orders are billed to this ledger; payouts settle against it.</span>
+              </div>
+              <div class="field">
+                <label for="postMode">Post sales as</label>
+                <select id="postMode"><option value="order">One transaction per order</option><option value="day">One transaction per day (consolidated)</option></select>
+              </div>
+            </div>
+            <div class="dropzone" id="dropzone">
+              <input type="file" accept=".csv,text/csv">
+              <div class="dropzone-icon" data-icon="upload"></div>
+              <strong>Drop the settlement CSV here</strong>
+              <p>Order ID, Order Date, SKU, Qty, Sale Amount, GST %, Commission, Shipping Fee, TCS, TDS, Ship State</p>
+            </div>
+            <div style="text-align:center;margin-top:16px">
+              <button class="btn btn-ghost btn-sm" id="useSampleBtn"><span data-icon="zap"></span>Load sample settlement</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Step 2 -->
+      <section id="step2" class="hidden">
+        <div class="stat-grid" id="summaryGrid"></div>
+        <div class="grid grid-main-side">
+          <div class="card">
+            <div class="card-head">
+              <div class="card-title"><span class="ct-icon" data-icon="file"></span><div id="ordersTitle">Orders</div></div>
+              <div class="toolbar">
+                <button class="btn btn-ghost btn-sm" id="backBtn">Start over</button>
+                <button class="btn btn-primary btn-sm" id="importBtn"><span data-icon="check"></span>Post to books</button>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table class="table stack-sm">
+                <thead><tr><th style="width:36px"><input type="checkbox" id="checkAll" checked></th><th>Order</th><th>Item</th><th class="num">Qty</th><th class="num">Sale</th><th class="num">Fees</th><th class="num">TCS / TDS</th><th class="num">Net</th></tr></thead>
+                <tbody id="orderBody"></tbody>
+              </table>
+            </div>
+          <div id="orderPager"></div>
+          </div>
+          <div class="card">
+            <div class="card-head"><div class="card-title"><span class="ct-icon" data-icon="ledger"></span><div>Accounting preview<small>What will be posted</small></div></div></div>
+            <div class="table-wrap">
+              <table class="table"><thead><tr><th>Ledger</th><th class="num">Debit</th><th class="num">Credit</th></tr></thead><tbody id="postingBody"></tbody><tfoot id="postingFoot"></tfoot></table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Step 3 -->
+      <section id="step3" class="hidden">
+        <div class="card" style="text-align:center;padding:40px 20px">
+          <div class="done-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+          <h2 style="font-size:22px">Settlement posted</h2>
+          <p class="muted" id="doneText" style="margin:6px 0 20px"></p>
+          <div class="page-actions" style="justify-content:center">
+            <a class="btn btn-outline" href="sales-purchase.html">View Sales Register</a>
+            <button class="btn btn-primary" id="againBtn"><span data-icon="upload"></span>Import another</button>
+          </div>
+        </div>
+      </section>
+
+      <div class="card mt">
+        <div class="card-head"><div class="card-title"><span class="ct-icon" data-icon="clock"></span><div>Import history</div></div></div>
+        <div class="table-wrap">
+          <table class="table stack-sm"><thead><tr><th>Imported on</th><th>Platform</th><th>File</th><th class="num">Orders</th><th class="num">Gross sales</th><th class="num">Net payout</th></tr></thead><tbody id="historyBody"></tbody></table>
+        </div>
+          <div id="histPager"></div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+<script src="assets/js/tally.js"></script>
+<script>
+  App.renderShell({ active: "ecommerce", title: "e-Commerce Import", subtitle: "Integrations · Marketplaces" });
+  var $ = function (id) { return document.getElementById(id); };
+  var histPg = App.pager("histPager", renderHistory, {});
+  var orderPg = App.pager("orderPager", render, { size: 25 });
+
+  var PLATFORMS = [
+    { key: "amazon", name: "Amazon", color: "#ff9900", letter: "a", ledger: "Amazon Seller Services" },
+    { key: "flipkart", name: "Flipkart", color: "#2874f0", letter: "F", ledger: "Flipkart Internet Pvt Ltd" },
+    { key: "meesho", name: "Meesho", color: "#9f2089", letter: "M", ledger: "" },
+    { key: "shopify", name: "Shopify", color: "#5e8e3e", letter: "S", ledger: "" }
+  ];
+  var platform = PLATFORMS[0], orders = [], fileName = "";
+
+  var SAMPLE = "Order ID,Order Date,SKU,Qty,Sale Amount,GST %,Commission,Shipping Fee,TCS,TDS,Ship State\n" +
+    "408-1123344-5566,2026-10-01,Basmati Rice 25kg,2,4515.00,5,451.50,120.00,43.00,43.00,Tamil Nadu\n" +
+    "408-1123344-5571,2026-10-01,LED Bulb 9W (Pack 10),3,2548.80,18,305.86,90.00,21.60,21.60,Karnataka\n" +
+    "408-1123344-5602,2026-10-02,Sunflower Oil 15L,1,2079.00,5,207.90,140.00,19.80,19.80,Kerala\n" +
+    "408-1123344-5617,2026-10-02,Detergent Powder 5kg,4,2548.80,18,254.88,110.00,21.60,21.60,Tamil Nadu\n" +
+    "408-1123344-5650,2026-10-03,Steel Container Set,2,1904.00,12,228.48,95.00,17.00,17.00,Maharashtra\n" +
+    "408-1123344-5688,2026-10-03,Toor Dal 30kg,1,3780.00,5,378.00,160.00,36.00,36.00,Tamil Nadu\n";
+
+  $("platforms").innerHTML = PLATFORMS.map(function (p, i) {
+    return '<div class="platform' + (i === 0 ? " active" : "") + '" data-k="' + p.key + '"><span class="pf-logo" style="background:' + p.color + '">' + p.letter + "</span>" + p.name + "</div>";
+  }).join("");
+  $("platforms").addEventListener("click", function (e) {
+    var el = e.target.closest(".platform");
+    if (!el) return;
+    platform = PLATFORMS.filter(function (p) { return p.key === el.dataset.k; })[0];
+    $("platforms").querySelectorAll(".platform").forEach(function (x) { x.classList.toggle("active", x === el); });
+    fillParty();
+  });
+
+  function fillParty() {
+    var debtors = App.ledgersIn(["Sundry Debtors"]);
+    var def = platform.ledger && App.findLedger(platform.ledger) ? platform.ledger : "";
+    $("partyLedger").innerHTML = App.ledgerOptions(debtors, def, def ? "" : "Select or create in Ledger & Group");
+  }
+
+  function num(s) { return Number(String(s || "").replace(/[^0-9.\-]/g, "")) || 0; }
+  function field(r, names) {
+    var keys = Object.keys(r);
+    for (var i = 0; i < names.length; i++) {
+      var k = keys.filter(function (x) { return x.toLowerCase().replace(/[^a-z%]/g, "") === names[i]; })[0];
+      if (k) return r[k];
+    }
+    return "";
+  }
+
+  function loadCsv(text, name) {
+    var rows = App.parseCSV(text);
+    if (!rows.length) return App.toast("That file has no rows we could read.", "bad");
+    fileName = name;
+    orders = rows.map(function (r, i) {
+      var sale = num(field(r, ["saleamount", "amount", "itemprice", "total"])), gst = num(field(r, ["gst%", "gst", "taxrate"]));
+      var fees = num(field(r, ["commission", "referralfee"])) + num(field(r, ["shippingfee", "shipping", "closingfee"]));
+      var tcs = num(field(r, ["tcs"])), tds = num(field(r, ["tds"]));
+      return {
+        i: i, include: true, orderId: field(r, ["orderid", "order"]), date: field(r, ["orderdate", "date"]) || App.today(),
+        sku: field(r, ["sku", "item", "product"]), qty: num(field(r, ["qty", "quantity"])) || 1,
+        sale: sale, gst: gst, fees: fees, tcs: tcs, tds: tds, net: Math.round((sale - fees - tcs - tds) * 100) / 100,
+        state: field(r, ["shipstate", "state", "shiptostate"])
+      };
+    }).filter(function (o) { return o.sale > 0; });
+    goStep(2);
+    render();
+  }
+
+  function goStep(n) {
+    [1, 2, 3].forEach(function (s) {
+      $("step" + s).classList.toggle("hidden", s !== n);
+      var el = document.querySelector('.wizard-step[data-step="' + s + '"]');
+      el.classList.toggle("active", s === n); el.classList.toggle("done", s < n);
+      el.querySelector(".ws-num").innerHTML = s < n ? "✓" : s;
+    });
+  }
+
+  function totals(list) {
+    return list.reduce(function (t, o) { t.sale += o.sale; t.fees += o.fees; t.tcs += o.tcs; t.tds += o.tds; t.net += o.net; return t; }, { sale: 0, fees: 0, tcs: 0, tds: 0, net: 0 });
+  }
+
+  function render() {
+    var sel = orders.filter(function (o) { return o.include; }), t = totals(sel);
+    $("ordersTitle").innerHTML = platform.name + " orders<small>" + App.esc(fileName) + " · " + sel.length + " of " + orders.length + " selected</small>";
+    var items = [
+      { label: "Gross Sales", value: App.compactInr(t.sale), sub: sel.length + " orders incl. GST", icon: "trendUp", tone: "brand" },
+      { label: "Marketplace Fees", value: App.compactInr(t.fees), sub: "Commission + shipping", icon: "ecommerce", tone: "warn" },
+      { label: "TCS + TDS", value: App.compactInr(t.tcs + t.tds), sub: "Claimable in GST / ITR", icon: "rupee", tone: "info" },
+      { label: "Net Payout", value: App.compactInr(t.net), sub: "Expected in bank", icon: "wallet", tone: "good" }
+    ];
+    $("summaryGrid").innerHTML = items.map(function (x) {
+      return '<div class="stat-card" style="--tint:var(--' + x.tone + ')"><div class="stat-top"><span class="stat-label">' + x.label + '</span><span class="stat-icon tone-' + x.tone + '">' + App.icon(x.icon) + '</span></div><div class="stat-value">' + x.value + '</div><div class="stat-sub">' + x.sub + "</div></div>";
+    }).join("");
+
+    $("orderBody").innerHTML = orderPg.slice(orders).map(function (o) {
+      return '<tr data-i="' + o.i + '" style="' + (o.include ? "" : "opacity:.45") + '"><td><input type="checkbox" class="o-inc"' + (o.include ? " checked" : "") + "></td>" +
+        '<td style="white-space:nowrap"><span class="mono cell-strong" style="font-size:12px">' + App.esc(o.orderId) + "</span><span class='cell-sub'>" + App.date(o.date) + " · " + App.esc(o.state) + "</span></td>" +
+        "<td style='min-width:150px'>" + App.esc(o.sku) + "<span class='cell-sub'>GST " + o.gst + "%</span></td>" +
+        '<td class="num">' + o.qty + '</td><td class="num cell-strong">' + App.inr(o.sale) + '</td><td class="num" style="color:var(--bad)">' + App.inr(o.fees) + '</td><td class="num">' + App.inr(o.tcs + o.tds) + '</td><td class="num cell-strong" style="color:var(--good)">' + App.inr(o.net) + "</td></tr>";
+    }).join("");
+
+    var party = $("partyLedger").value || platform.name;
+    var post = [
+      [party + " (sales)", t.sale, 0], ["Sales Account + GST", 0, t.sale],
+      ["Marketplace Commission", t.fees, 0], ["TCS Receivable", t.tcs, 0], ["TDS Receivable", t.tds, 0],
+      [party + " (deductions)", 0, t.fees + t.tcs + t.tds]
+    ];
+    $("postingBody").innerHTML = post.map(function (p) {
+      return '<tr><td class="cell-strong" style="font-size:12.5px">' + App.esc(p[0]) + '</td><td class="num">' + (p[1] ? App.inr(p[1]) : "") + '</td><td class="num">' + (p[2] ? App.inr(p[2]) : "") + "</td></tr>";
+    }).join("");
+    $("postingFoot").innerHTML = '<tr><td>Net receivable</td><td class="num" colspan="2" style="color:var(--good)">' + App.inr(t.net) + "</td></tr>";
+  }
+
+  $("orderBody").addEventListener("change", function (e) {
+    var tr = e.target.closest("tr[data-i]");
+    if (!tr) return;
+    orders.filter(function (o) { return o.i === Number(tr.dataset.i); })[0].include = e.target.checked;
+    render();
+  });
+  $("checkAll").addEventListener("change", function () {
+    var on = this.checked;
+    orders.forEach(function (o) { o.include = on; });
+    render();
+  });
+  $("partyLedger").addEventListener("change", function () { if (orders.length) render(); });
+  $("backBtn").addEventListener("click", function () { orders = []; goStep(1); });
+  $("againBtn").addEventListener("click", function () { orders = []; goStep(1); });
+
+  $("importBtn").addEventListener("click", function () {
+    var party = $("partyLedger").value;
+    if (!party) return App.toast("Pick a marketplace ledger first (step 1).", "bad");
+    var sel = orders.filter(function (o) { return o.include; });
+    if (!sel.length) return App.toast("Select at least one order.", "bad");
+
+    // Sale amounts include GST, so back out the taxable rate per unit.
+    function toItem(o) {
+      var taxable = o.sale / (1 + o.gst / 100);
+      var known = Data.ITEMS.filter(function (it) { return it.name === o.sku; })[0];
+      return { name: o.sku, hsn: known ? known.hsn : "", qty: o.qty, rate: Math.round(taxable / o.qty * 100) / 100, gst: o.gst, unit: known ? known.unit : "Nos" };
+    }
+    var groups = {};
+    sel.forEach(function (o) {
+      var key = $("postMode").value === "day" ? o.date + "|" + o.state : o.orderId;
+      (groups[key] = groups[key] || []).push(o);
+    });
+    var count = 0;
+    Object.keys(groups).forEach(function (k) {
+      var g = groups[k];
+      Data.addVoucher({
+        type: "Sales", date: g[0].date, party: party, partyState: g[0].state, partyGstin: "", account: "Sales Account",
+        items: g.map(toItem), ref: g.length === 1 ? g[0].orderId : g.length + " orders", source: "ecommerce",
+        narration: platform.name + " " + (g.length === 1 ? "order " + g[0].orderId : "orders of " + App.date(g[0].date))
+      });
+      count++;
+    });
+    var t = totals(sel);
+    var lines = [{ ledger: "Marketplace Commission", dr: Math.round(t.fees * 100) / 100, cr: 0 }, { ledger: "TCS Receivable", dr: Math.round(t.tcs * 100) / 100, cr: 0 }, { ledger: "TDS Receivable", dr: Math.round(t.tds * 100) / 100, cr: 0 }]
+      .filter(function (l) { return l.dr > 0; });
+    var ded = lines.reduce(function (s, l) { return s + l.dr; }, 0);
+    if (ded > 0) {
+      lines.push({ ledger: party, dr: 0, cr: Math.round(ded * 100) / 100 });
+      Data.addVoucher({ type: "Journal", date: sel[sel.length - 1].date, party: "Marketplace Commission", account: "", total: ded, lines: lines, source: "ecommerce", narration: platform.name + " fees, TCS and TDS deducted from settlement" });
+    }
+    Data.add("imports", { kind: "ecommerce", platform: platform.name, file: fileName, lines: sel.length, gross: t.sale, net: t.net });
+    $("doneText").textContent = count + " sales transaction" + (count > 1 ? "s" : "") + (ded > 0 ? " and 1 journal" : "") + " posted against " + party + ". Net receivable " + App.inr(t.net) + ".";
+    goStep(3); renderHistory();
+    App.toast(platform.name + " settlement posted.");
+  });
+
+  function renderHistory() {
+    var h = Data.list("imports").filter(function (x) { return x.kind === "ecommerce"; }).reverse();
+    var hPage = histPg.slice(h);
+    $("historyBody").innerHTML = hPage.length ? hPage.map(function (x) {
+      return "<tr><td>" + App.dateTime(x.createdAt) + '</td><td><span class="badge badge-brand plain">' + App.esc(x.platform) + '</span></td><td class="mono" style="font-size:12px">' + App.esc(x.file) + '</td><td class="num">' + x.lines + '</td><td class="num">' + App.inr(x.gross) + '</td><td class="num cell-strong">' + App.inr(x.net) + "</td></tr>";
+    }).join("") : App.emptyRow(6, "No imports yet", "Your marketplace imports will be listed here.");
+  }
+
+  App.wireDropzone($("dropzone"), loadCsv);
+  $("useSampleBtn").addEventListener("click", function () { loadCsv(SAMPLE, platform.key + "_settlement_oct2026.csv"); });
+  $("sampleCsvBtn").addEventListener("click", function () { App.downloadFile(platform.key + "_sample_settlement.csv", SAMPLE); });
+  fillParty(); renderHistory();
+</script>
+</body>
+</html>

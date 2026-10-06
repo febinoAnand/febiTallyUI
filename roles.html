@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Roles &amp; Permissions · Tally Suite</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<div class="layout">
+  <aside id="sidebar"></aside>
+  <div class="main">
+    <header id="topbar"></header>
+    <main class="content">
+
+      <div class="page-head">
+        <h1>Roles &amp; Permissions</h1>
+        <div class="page-actions">
+          <button class="btn btn-primary" id="newRoleBtn" data-perm="create"><span data-icon="plus"></span>New Role</button>
+        </div>
+      </div>
+
+      <div class="grid grid-side-main">
+        <div class="card" style="align-self:start">
+          <div class="card-head"><div class="card-title"><span class="ct-icon" data-icon="shield"></span><div>Roles<small id="roleCount"></small></div></div></div>
+          <div class="role-list" id="roleList"></div>
+        </div>
+
+        <div class="card" id="editor">
+          <div class="card-head">
+            <div class="card-title"><span class="ct-icon" data-icon="key"></span><div id="editorTitle">Role</div></div>
+            <span class="dirty-dot" id="dirty">Unsaved changes</span>
+          </div>
+          <div class="card-body">
+            <div class="alert-bar" id="lockNote" style="background:var(--info-soft);color:var(--info);border-left-color:var(--info)">
+              <span data-icon="lock"></span><span id="lockText">Administrator always has full access and can't be changed.</span>
+            </div>
+            <div class="field-grid">
+              <div class="field">
+                <label for="rName">Role Name <span class="req">*</span></label>
+                <input type="text" id="rName" placeholder="e.g. Branch Accountant">
+                <span class="err-msg" id="errRName">Enter a unique role name.</span>
+              </div>
+              <div class="field">
+                <label for="rDesc">Description</label>
+                <input type="text" id="rDesc" placeholder="What is this role for?">
+              </div>
+            </div>
+          </div>
+
+          <div class="table-wrap" style="border-top:1px solid var(--border)">
+            <table class="table perm-table">
+              <thead id="permHead"></thead>
+              <tbody id="permBody"></tbody>
+            </table>
+          </div>
+
+          <div class="card-body" style="border-top:1px solid var(--border)">
+            <div class="card-title" style="font-size:13px;margin-bottom:10px">Users with this role</div>
+            <div class="member-chips" id="members"></div>
+          </div>
+
+          <div class="card-foot">
+            <button class="btn btn-danger" id="deleteRoleBtn" data-perm="delete"><span data-icon="trash"></span>Delete role</button>
+            <button class="btn btn-ghost" id="duplicateBtn" data-perm="create"><span data-icon="copy"></span>Duplicate</button>
+            <span style="flex:1"></span>
+            <button class="btn btn-ghost" id="discardBtn" data-perm="edit">Discard</button>
+            <button class="btn btn-primary" id="saveBtn" data-perm="edit"><span data-icon="check"></span>Save changes</button>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+<script src="assets/js/tally.js"></script>
+<script>
+  App.renderShell({ active: "roles", title: "Roles & Permissions", subtitle: "Administration" });
+  var $ = function (id) { return document.getElementById(id); };
+  var LABEL = { view: "View", create: "Create", edit: "Edit", delete: "Delete" };
+  var selectedId = Data.list("roles")[0].id, draft = null, isNew = false;
+  var canEdit = App.can("roles", "edit"), canCreate = App.can("roles", "create");
+
+  function totalPossible() { return Data.MODULES.reduce(function (s, m) { return s + m.actions.length; }, 0); }
+  function countPerms(perms) { return Data.MODULES.reduce(function (s, m) { return s + (perms[m.key] || []).length; }, 0); }
+  function usersIn(roleId) { return Data.list("users").filter(function (u) { return u.roleId === roleId; }); }
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+  function locked() { return draft.id === Data.ADMIN_ROLE || (!canEdit && !isNew); }
+
+  /* ---------------- Role list ---------------- */
+  function renderList() {
+    var rs = Data.list("roles");
+    $("roleCount").textContent = rs.length + " roles";
+    $("roleList").innerHTML = rs.map(function (r) {
+      var n = usersIn(r.id).length, pct = Math.round(countPerms(r.perms) / totalPossible() * 100);
+      var tag = r.system ? '<span class="badge badge-brand plain">System</span>' : r.builtIn ? '<span class="badge badge-muted plain">Built-in</span>' : '<span class="badge badge-warn plain">Custom</span>';
+      return '<button class="role-item' + (r.id === selectedId && !isNew ? " active" : "") + '" data-id="' + r.id + '">' +
+        '<div class="role-item-top"><strong>' + App.esc(r.name) + "</strong>" + tag + '<span class="count">' + App.icon("users") + n + "</span></div>" +
+        "<p>" + App.esc(r.description || "No description") + '</p><div class="perm-meter"><span style="width:' + pct + '%"></span></div></button>';
+    }).join("");
+  }
+  $("roleList").addEventListener("click", function (e) {
+    var b = e.target.closest(".role-item");
+    if (!b || (b.dataset.id === selectedId && !isNew)) return;
+    var go = function () { select(b.dataset.id); };
+    if (isDirty()) App.confirm({ title: "Discard changes?", message: "Discard unsaved changes to this role?", ok: "Discard" }).then(function (ok) { if (ok) go(); }); else go();
+  });
+
+  /* ---------------- Editor ---------------- */
+  function select(id) {
+    selectedId = id; isNew = false;
+    draft = clone(Data.roleById(id));
+    renderList(); renderEditor();
+  }
+
+  function renderEditor() {
+    var r = draft, lock = locked();
+    $("editorTitle").innerHTML = (isNew ? "New role" : App.esc(r.name)) + "<small id='permCount'></small>";
+    $("rName").value = r.name; $("rDesc").value = r.description || "";
+    $("rName").disabled = $("rDesc").disabled = lock || !!r.system;
+    $("errRName").classList.remove("show"); $("rName").classList.remove("error");
+    $("lockNote").classList.toggle("show", !!r.system || (!canEdit && !isNew));
+    $("lockText").textContent = r.system ? "Administrator always has full access and can't be changed." : "Your role can view permissions but not change them.";
+
+    var cols = Data.ACTIONS;
+    $("permHead").innerHTML = "<tr><th>Module</th>" + cols.map(function (a) {
+      return '<th class="c">' + LABEL[a] + (lock ? "" : '<button type="button" class="col-toggle" data-col="' + a + '">all / none</button>') + "</th>";
+    }).join("") + "</tr>";
+
+    var html = "", group = "";
+    Data.MODULES.forEach(function (m) {
+      if (m.group !== group) { group = m.group; html += '<tr class="grp"><td colspan="' + (cols.length + 1) + '">' + group + "</td></tr>"; }
+      var has = r.perms[m.key] || [];
+      html += '<tr><td><span class="mod">' + m.label + "</span>" + (m.note ? '<span class="mod-note">' + m.note + "</span>" : "") + "</td>" + cols.map(function (a) {
+        if (m.actions.indexOf(a) === -1) return '<td class="c"><span class="na" title="Not applicable">—</span></td>';
+        // Everyone who can sign in sees the dashboard.
+        var forced = m.key === "dashboard" && a === "view";
+        return '<td class="c"><label class="pcheck" title="' + LABEL[a] + " · " + m.label + '"><input type="checkbox" data-m="' + m.key + '" data-a="' + a + '"' +
+          (has.indexOf(a) !== -1 || forced ? " checked" : "") + (lock || forced ? " disabled" : "") + "><span></span></label></td>";
+      }).join("") + "</tr>";
+    });
+    $("permBody").innerHTML = html;
+
+    var members = isNew ? [] : usersIn(r.id);
+    $("members").innerHTML = members.length ? members.map(function (u) { return "<span><i>" + App.esc(App.initials(u.name)) + "</i>" + App.esc(u.name) + "</span>"; }).join("") : '<span class="muted" style="background:none;padding:0;font-weight:600">No users yet</span>';
+
+    $("deleteRoleBtn").style.display = r.system || r.builtIn || isNew ? "none" : "";
+    $("duplicateBtn").style.display = isNew ? "none" : "";
+    $("saveBtn").style.display = $("discardBtn").style.display = r.system || (!canEdit && !isNew) ? "none" : "";
+    $("saveBtn").lastChild.textContent = isNew ? "Create role" : "Save changes";
+    syncCounts();
+  }
+
+  function syncCounts() {
+    var n = countPerms(draft.perms);
+    var pc = $("permCount");
+    if (pc) pc.textContent = n + " of " + totalPossible() + " permissions";
+    $("dirty").classList.toggle("show", isDirty());
+  }
+  function isDirty() {
+    if (!draft) return false;
+    if (isNew) return true;
+    var saved = Data.roleById(draft.id);
+    return !!saved && JSON.stringify({ n: saved.name, d: saved.description || "", p: saved.perms }) !== JSON.stringify({ n: draft.name, d: draft.description || "", p: draft.perms });
+  }
+
+  function setPerm(mKey, action, on) {
+    var m = Data.MODULES.filter(function (x) { return x.key === mKey; })[0];
+    var cur = draft.perms[mKey] || [];
+    if (on && cur.indexOf(action) === -1) cur.push(action);
+    if (!on) cur = cur.filter(function (a) { return a !== action; });
+    // Any create/edit/delete needs view; removing view removes everything else.
+    if (on && action !== "view" && cur.indexOf("view") === -1) cur.push("view");
+    if (!on && action === "view") cur = [];
+    if (mKey === "dashboard") cur = ["view"];
+    draft.perms[mKey] = m.actions.filter(function (a) { return cur.indexOf(a) !== -1; });
+  }
+
+  $("permBody").addEventListener("change", function (e) {
+    var cb = e.target;
+    if (!cb.dataset.m) return;
+    setPerm(cb.dataset.m, cb.dataset.a, cb.checked);
+    refreshChecks();
+  });
+  $("permHead").addEventListener("click", function (e) {
+    var b = e.target.closest("[data-col]");
+    if (!b) return;
+    var a = b.dataset.col;
+    var applicable = Data.MODULES.filter(function (m) { return m.actions.indexOf(a) !== -1 && !(m.key === "dashboard"); });
+    var allOn = applicable.every(function (m) { return (draft.perms[m.key] || []).indexOf(a) !== -1; });
+    applicable.forEach(function (m) { setPerm(m.key, a, !allOn); });
+    refreshChecks();
+  });
+  function refreshChecks() {
+    $("permBody").querySelectorAll("input[data-m]").forEach(function (cb) {
+      cb.checked = (draft.perms[cb.dataset.m] || []).indexOf(cb.dataset.a) !== -1 || (cb.dataset.m === "dashboard");
+    });
+    syncCounts();
+  }
+  $("rName").addEventListener("input", function () { draft.name = this.value; syncCounts(); });
+  $("rDesc").addEventListener("input", function () { draft.description = this.value; syncCounts(); });
+
+  /* ---------------- Actions ---------------- */
+  function emptyPerms() { var p = {}; Data.MODULES.forEach(function (m) { p[m.key] = m.key === "dashboard" ? ["view"] : []; }); return p; }
+
+  $("newRoleBtn").addEventListener("click", function () {
+    var go = function () {
+      isNew = true;
+      draft = { name: "", description: "", perms: emptyPerms() };
+      renderList(); renderEditor();
+      $("rName").focus();
+    };
+    if (isDirty() && !isNew) App.confirm({ title: "Discard changes?", message: "Discard unsaved changes to this role?", ok: "Discard" }).then(function (ok) { if (ok) go(); }); else go();
+  });
+  $("duplicateBtn").addEventListener("click", function () {
+    var src = Data.roleById(selectedId);
+    isNew = true;
+    draft = { name: src.name + " (copy)", description: src.description, perms: clone(src.perms) };
+    renderList(); renderEditor();
+    $("rName").select();
+  });
+  $("discardBtn").addEventListener("click", function () {
+    if (isNew) { select(selectedId); return; }
+    draft = clone(Data.roleById(selectedId));
+    renderEditor();
+  });
+
+  $("saveBtn").addEventListener("click", function () {
+    var name = draft.name.trim();
+    var clash = Data.list("roles").some(function (r) { return r.name.toLowerCase() === name.toLowerCase() && (isNew || r.id !== draft.id); });
+    var bad = !name || clash;
+    $("rName").classList.toggle("error", bad);
+    $("errRName").textContent = clash ? "A role with this name already exists." : "Enter a role name.";
+    $("errRName").classList.toggle("show", bad);
+    if (bad) return;
+    var save = function () {
+      if (isNew) {
+        var r = Data.add("roles", { name: name, description: draft.description.trim(), perms: draft.perms });
+        App.toast("Role “" + name + "” created. Assign it from the Users page.");
+        select(r.id);
+      } else {
+        Data.update("roles", draft.id, { name: name, description: (draft.description || "").trim(), perms: draft.perms });
+        App.toast("Permissions for “" + name + "” saved. Users get them on their next page load.");
+        select(draft.id);
+      }
+    };
+    if (countPerms(draft.perms) <= 1) App.confirm({ title: "Save this role?", message: "This role can only see the dashboard.", ok: "Save anyway" }).then(function (ok) { if (ok) save(); });
+    else save();
+  });
+
+  $("deleteRoleBtn").addEventListener("click", function () {
+    var n = usersIn(draft.id).length;
+    if (n) return App.toast("Move the " + n + " user" + (n > 1 ? "s" : "") + " with this role to another role first.", "bad");
+    App.confirm({ title: "Delete role?", message: "Delete role “" + draft.name + "”?", ok: "Delete", danger: true }).then(function (ok) {
+      if (!ok) return;
+      Data.remove("roles", draft.id);
+      App.toast("Role deleted.");
+      select(Data.list("roles")[0].id);
+    });
+  });
+
+  window.addEventListener("beforeunload", function (e) { if (isDirty() && (canEdit || isNew)) { e.preventDefault(); e.returnValue = ""; } });
+
+  select(selectedId);
+</script>
+</body>
+</html>

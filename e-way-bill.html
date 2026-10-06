@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>e-Way Bill · Tally Suite</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<div class="layout">
+  <aside id="sidebar"></aside>
+  <div class="main">
+    <header id="topbar"></header>
+    <main class="content">
+
+      <div class="page-head">
+        <h1>e-Way Bill</h1>
+      </div>
+
+      <div class="stat-grid" id="statGrid"></div>
+
+      <div class="grid grid-main-side" data-perm="create">
+        <form class="card" id="ewbForm" novalidate>
+          <div class="card-head">
+            <div class="card-title"><span class="ct-icon" data-icon="edit"></span><div>Generate e-Way Bill<small>Part A: invoice details · Part B: transport</small></div></div>
+          </div>
+          <div class="card-body">
+            <div class="section-label" style="margin-top:0">Part A · Invoice</div>
+            <div class="field-grid">
+              <div class="field full">
+                <label for="eInvoice">Sales Invoice <span class="req">*</span></label>
+                <select id="eInvoice"></select>
+                <span class="field-hint" id="eInvoiceHint"></span>
+                <span class="err-msg" id="errEInvoice">Select an invoice.</span>
+              </div>
+              <div class="field">
+                <label for="eSubType">Sub Type</label>
+                <select id="eSubType"><option>Supply</option><option>Export</option><option>Job Work</option><option>SKD/CKD</option><option>Others</option></select>
+              </div>
+              <div class="field">
+                <label for="eFrom">Dispatch From (PIN)</label>
+                <input type="text" id="eFrom" maxlength="6" placeholder="600040">
+              </div>
+              <div class="field">
+                <label for="eTo">Ship To (Place)</label>
+                <input type="text" id="eTo" placeholder="City">
+              </div>
+              <div class="field">
+                <label for="eToPin">Ship To (PIN) <span class="req">*</span></label>
+                <input type="text" id="eToPin" maxlength="6" placeholder="6-digit PIN">
+                <span class="err-msg" id="errEToPin">Enter a 6-digit PIN code.</span>
+              </div>
+            </div>
+
+            <div class="section-label" style="margin-top:22px">Part B · Transport</div>
+            <div class="field-grid">
+              <div class="field">
+                <label for="eMode">Mode</label>
+                <select id="eMode"><option>Road</option><option>Rail</option><option>Air</option><option>Ship</option></select>
+              </div>
+              <div class="field">
+                <label for="eDistance">Approx. Distance (km) <span class="req">*</span></label>
+                <input type="number" id="eDistance" min="1" max="4000" placeholder="e.g. 350">
+                <span class="err-msg" id="errEDistance">Enter a distance between 1 and 4000 km.</span>
+              </div>
+              <div class="field">
+                <label for="eVehicle">Vehicle No. <span class="req">*</span></label>
+                <input type="text" id="eVehicle" placeholder="TN01AB1234" style="text-transform:uppercase">
+                <span class="err-msg" id="errEVehicle">Enter a valid vehicle number (e.g. TN01AB1234).</span>
+              </div>
+              <div class="field">
+                <label for="eVehicleType">Vehicle Type</label>
+                <select id="eVehicleType"><option>Regular</option><option>Over Dimensional Cargo</option></select>
+              </div>
+              <div class="field">
+                <label for="eTransporter">Transporter Name</label>
+                <input type="text" id="eTransporter" placeholder="Optional">
+              </div>
+              <div class="field">
+                <label for="eTransId">Transporter ID / GSTIN</label>
+                <input type="text" id="eTransId" maxlength="15" placeholder="Optional" style="text-transform:uppercase">
+              </div>
+            </div>
+          </div>
+          <div class="card-foot">
+            <button type="reset" class="btn btn-ghost" id="resetBtn">Clear</button>
+            <button type="submit" class="btn btn-primary"><span data-icon="ewaybill"></span>Generate e-Way Bill</button>
+          </div>
+        </form>
+
+        <div>
+          <div class="ewb-card card">
+            <div class="ewb-card-top"><div><div style="font-size:11px;opacity:.8;font-weight:700;letter-spacing:.1em">E-WAY BILL PREVIEW</div><div class="mono" id="pvNumber">XXXX XXXX XXXX</div></div><span data-icon="ewaybill" style="width:30px;height:30px;display:inline-flex"></span></div>
+            <div class="card-body">
+              <dl class="kv" id="pvDetails"></dl>
+              <div style="margin-top:18px">
+                <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:700;margin-bottom:6px"><span>Validity</span><span id="pvValidity">—</span></div>
+                <div class="validity-bar"><span id="pvBar" style="width:0"></span></div>
+                <p class="muted" style="font-size:11.5px;margin:8px 0 0">Regular vehicles: 1 day per 200 km. Over-dimensional cargo: 1 day per 20 km.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card mt">
+        <div class="card-head">
+          <div class="card-title"><span class="ct-icon" data-icon="ledger"></span><div>e-Way Bills<small id="listSub"></small></div></div>
+          <div class="segmented" id="filterTabs">
+            <button class="active" data-f="">All</button><button data-f="Active">Active</button><button data-f="Expired">Expired</button><button data-f="Cancelled">Cancelled</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="table stack-sm">
+            <thead><tr><th>EWB No.</th><th>Invoice</th><th>To</th><th>Vehicle</th><th class="num">Distance</th><th>Valid until</th><th>Status</th><th></th></tr></thead>
+            <tbody id="listBody"></tbody>
+          </table>
+        </div>
+          <div id="listPager"></div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<div class="modal-overlay" id="vehicleModal">
+  <div class="modal">
+    <div class="modal-head"><h3>Update vehicle (Part B)</h3><button class="icon-btn" data-close="vehicleModal" data-icon="x"></button></div>
+    <div class="modal-body">
+      <div class="field-grid">
+        <div class="field"><label for="uVehicle">New Vehicle No.</label><input type="text" id="uVehicle" style="text-transform:uppercase"></div>
+        <div class="field"><label for="uReason">Reason</label><select id="uReason"><option>Breakdown</option><option>Transhipment</option><option>Others</option></select></div>
+      </div>
+    </div>
+    <div class="modal-foot"><button class="btn btn-ghost" data-close="vehicleModal">Cancel</button><button class="btn btn-primary" id="uSave">Update</button></div>
+  </div>
+</div>
+
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+<script src="assets/js/tally.js"></script>
+<script>
+  var tenant = App.renderShell({ active: "ewaybill", title: "e-Way Bill", subtitle: "GST compliance · Goods movement" });
+  var $ = function (id) { return document.getElementById(id); };
+  var listPg = App.pager("listPager", renderList, {});
+  var filter = "", updatingId = null;
+  var VEHICLE_RE = /^[A-Z]{2}\d{1,2}[A-Z]{0,3}\d{4}$/;
+
+  function validityDays(km, odc) { return Math.max(1, Math.ceil((Number(km) || 0) / (odc ? 20 : 200))); }
+  function statusOf(b) {
+    if (b.status === "Cancelled") return "Cancelled";
+    return new Date(b.validUntil) < new Date() ? "Expired" : "Active";
+  }
+
+  function invoices() { return Data.list("vouchers").filter(function (v) { return v.type === "Sales"; }); }
+  function fillInvoices() {
+    var used = Data.list("ewaybills").filter(function (b) { return b.status !== "Cancelled"; }).map(function (b) { return b.voucherId; });
+    var opts = invoices().filter(function (v) { return used.indexOf(v.id) === -1; }).sort(function (a, b) { return b.date.localeCompare(a.date); });
+    $("eInvoice").innerHTML = '<option value="">Select invoice</option>' + opts.map(function (v) {
+      return '<option value="' + v.id + '">' + v.number + " · " + App.esc(v.party) + " · " + App.inr0(v.total) + "</option>";
+    }).join("");
+  }
+
+  function preview() {
+    var v = Data.get("vouchers", $("eInvoice").value);
+    var km = $("eDistance").value, odc = $("eVehicleType").value !== "Regular";
+    var days = validityDays(km, odc);
+    $("eInvoiceHint").textContent = v ? (v.total < 50000 ? "Invoice value is under ₹50,000, so an e-Way Bill is optional for this one." : "e-Way Bill required (value over ₹50,000).") : "";
+    $("pvDetails").innerHTML =
+      "<dt>From</dt><dd>" + App.esc(tenant.companyName) + "<br><span class='muted'>" + App.esc(tenant.state) + " " + App.esc($("eFrom").value) + "</span></dd>" +
+      "<dt>To</dt><dd>" + (v ? App.esc(v.party) + "<br><span class='muted'>" + App.esc($("eTo").value || v.partyState || "") + " " + App.esc($("eToPin").value) + "</span>" : "—") + "</dd>" +
+      "<dt>Invoice</dt><dd class='mono'>" + (v ? v.number : "—") + "</dd>" +
+      "<dt>Value</dt><dd>" + (v ? App.inr(v.total) : "—") + "</dd>" +
+      "<dt>HSN</dt><dd class='mono'>" + (v ? v.items.map(function (i) { return i.hsn; }).filter(Boolean).join(", ") : "—") + "</dd>" +
+      "<dt>Vehicle</dt><dd class='mono'>" + (App.esc($("eVehicle").value.toUpperCase()) || "—") + " · " + $("eMode").value + "</dd>";
+    $("pvValidity").textContent = km ? days + " day" + (days > 1 ? "s" : "") + " · until " + App.date(validUntil(days)) : "—";
+    $("pvBar").style.width = km ? Math.min(100, days / 15 * 100) + "%" : "0";
+  }
+  // Validity runs to midnight of the last day, as on the EWB portal.
+  function validUntil(days) {
+    var d = new Date(); d.setDate(d.getDate() + days); d.setHours(23, 59, 0, 0);
+    return d.toISOString();
+  }
+
+  $("eInvoice").addEventListener("change", function () {
+    var v = Data.get("vouchers", this.value);
+    if (v) { $("eTo").value = v.partyState || ""; }
+    preview();
+  });
+  ["eFrom", "eTo", "eToPin", "eMode", "eDistance", "eVehicle", "eVehicleType"].forEach(function (id) { $(id).addEventListener("input", preview); $(id).addEventListener("change", preview); });
+  $("resetBtn").addEventListener("click", function () { setTimeout(preview, 0); });
+
+  $("ewbForm").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var vehicle = $("eVehicle").value.trim().toUpperCase().replace(/\s/g, ""), km = Number($("eDistance").value);
+    var checks = [
+      ["eInvoice", "errEInvoice", !!$("eInvoice").value],
+      ["eToPin", "errEToPin", /^[1-9]\d{5}$/.test($("eToPin").value.trim())],
+      ["eDistance", "errEDistance", km >= 1 && km <= 4000],
+      ["eVehicle", "errEVehicle", VEHICLE_RE.test(vehicle)]
+    ];
+    var ok = true;
+    checks.forEach(function (c) { $(c[0]).classList.toggle("error", !c[2]); $(c[1]).classList.toggle("show", !c[2]); ok = ok && c[2]; });
+    if (!ok) return App.toast("Please fix the highlighted fields.", "bad");
+
+    var v = Data.get("vouchers", $("eInvoice").value);
+    var days = validityDays(km, $("eVehicleType").value !== "Regular");
+    var ewbNo = String(Math.floor(Math.random() * 9 + 1)) + String(Date.now()).slice(-11);
+    Data.add("ewaybills", {
+      ewbNo: ewbNo, voucherId: v.id, invoiceNumber: v.number, party: v.party, value: v.total,
+      fromPin: $("eFrom").value.trim(), toPlace: $("eTo").value.trim(), toPin: $("eToPin").value.trim(),
+      subType: $("eSubType").value, mode: $("eMode").value, distance: km, vehicleNo: vehicle, vehicleType: $("eVehicleType").value,
+      transporter: $("eTransporter").value.trim(), transporterId: $("eTransId").value.trim().toUpperCase(),
+      generatedAt: new Date().toISOString(), validUntil: validUntil(days), status: "Active"
+    });
+    App.toast("e-Way Bill " + ewbNo.replace(/(\d{4})(?=\d)/g, "$1 ") + " generated.");
+    $("ewbForm").reset();
+    fillInvoices(); preview(); renderStats(); renderList();
+  });
+
+  function renderStats() {
+    var bills = Data.list("ewaybills"), c = { Active: 0, Expired: 0, Cancelled: 0 };
+    bills.forEach(function (b) { c[statusOf(b)]++; });
+    var soon = bills.filter(function (b) { return statusOf(b) === "Active" && new Date(b.validUntil) - new Date() < 24 * 3600 * 1000; }).length;
+    var items = [
+      { label: "Active", value: c.Active, sub: "Goods in transit", icon: "ewaybill", tone: "good" },
+      { label: "Expiring in 24h", value: soon, sub: soon ? "Extend if still in transit" : "Nothing urgent", icon: "clock", tone: "warn" },
+      { label: "Expired", value: c.Expired, sub: "Past validity", icon: "alert", tone: "bad" },
+      { label: "Total Value Moved", value: App.compactInr(bills.filter(function (b) { return b.status !== "Cancelled"; }).reduce(function (s, b) { return s + b.value; }, 0)), sub: bills.length + " e-Way Bills", icon: "rupee", tone: "brand" }
+    ];
+    $("statGrid").innerHTML = items.map(function (x) {
+      return '<div class="stat-card" style="--tint:var(--' + x.tone + ')"><div class="stat-top"><span class="stat-label">' + x.label + '</span><span class="stat-icon tone-' + x.tone + '">' + App.icon(x.icon) + '</span></div><div class="stat-value">' + x.value + '</div><div class="stat-sub">' + x.sub + "</div></div>";
+    }).join("");
+  }
+
+  var BADGE = { Active: "badge-good", Expired: "badge-warn", Cancelled: "badge-bad" };
+  function renderList() {
+    var bills = Data.list("ewaybills").filter(function (b) { return !filter || statusOf(b) === filter; }).reverse();
+    $("listSub").textContent = bills.length + " shown";
+    var billsPage = listPg.slice(bills);
+    $("listBody").innerHTML = billsPage.length ? billsPage.map(function (b) {
+      var st = statusOf(b), fresh = Date.now() - new Date(b.generatedAt).getTime() < 24 * 3600 * 1000;
+      return '<tr><td class="mono cell-strong">' + b.ewbNo.replace(/(\d{4})(?=\d)/g, "$1 ") + "<span class='cell-sub'>" + App.dateTime(b.generatedAt) + "</span></td>" +
+        '<td class="mono" style="font-size:12px">' + b.invoiceNumber + "<span class='cell-sub' style='font-family:var(--font)'>" + App.esc(b.party) + "</span></td>" +
+        "<td>" + App.esc(b.toPlace) + " <span class='muted mono'>" + b.toPin + "</span></td>" +
+        '<td class="mono" style="font-size:12px">' + b.vehicleNo + "<span class='cell-sub' style='font-family:var(--font)'>" + b.mode + "</span></td>" +
+        '<td class="num">' + b.distance + " km</td><td>" + App.dateTime(b.validUntil) + '</td><td><span class="badge ' + BADGE[st] + '">' + st + "</span></td>" +
+        '<td><div class="row-actions">' +
+        (st === "Active" ? '<button class="btn btn-ghost btn-xs" data-perm="edit" data-veh="' + b.id + '" title="Update vehicle">' + App.icon("edit") + "</button>" : "") +
+        (st !== "Cancelled" ? '<button class="btn btn-ghost btn-xs" data-perm="edit" data-ext="' + b.id + '" title="Extend validity">' + App.icon("refresh") + "Extend</button>" : "") +
+        (st === "Active" && fresh ? '<button class="btn btn-danger btn-xs" data-perm="delete" data-cancel="' + b.id + '" title="Cancel (within 24h)">' + App.icon("x") + "</button>" : "") +
+        "</div></td></tr>";
+    }).join("") : App.emptyRow(8, "No e-Way Bills", "Generate one from a sales invoice above.");
+  }
+
+  $("filterTabs").addEventListener("click", function (e) {
+    var b = e.target.closest("button");
+    if (!b) return;
+    filter = b.dataset.f;
+    $("filterTabs").querySelectorAll("button").forEach(function (x) { x.classList.toggle("active", x === b); });
+    renderList();
+  });
+
+  $("listBody").addEventListener("click", function (e) {
+    var b = e.target.closest("button");
+    if (!b) return;
+    if (b.dataset.veh) { updatingId = b.dataset.veh; $("uVehicle").value = Data.get("ewaybills", updatingId).vehicleNo; App.openModal("vehicleModal"); }
+    if (b.dataset.ext) {
+      var bill = Data.get("ewaybills", b.dataset.ext);
+      var extra = validityDays(bill.distance, bill.vehicleType !== "Regular");
+      var base = new Date(Math.max(new Date(bill.validUntil).getTime(), Date.now()));
+      base.setDate(base.getDate() + extra);
+      Data.update("ewaybills", bill.id, { validUntil: base.toISOString() });
+      App.toast("Validity extended by " + extra + " day" + (extra > 1 ? "s" : "") + ".");
+      renderStats(); renderList();
+    }
+    if (b.dataset.cancel) {
+      var cancelId = b.dataset.cancel;
+      App.confirm({ title: "Cancel this e-Way Bill?", message: "The invoice becomes available for a new e-Way Bill.", ok: "Cancel e-Way Bill", danger: true }).then(function (ok) {
+        if (!ok) return;
+        Data.update("ewaybills", cancelId, { status: "Cancelled" });
+        App.toast("e-Way Bill cancelled.", "info");
+        fillInvoices(); renderStats(); renderList();
+      });
+    }
+  });
+  $("uSave").addEventListener("click", function () {
+    var v = $("uVehicle").value.trim().toUpperCase().replace(/\s/g, "");
+    if (!VEHICLE_RE.test(v)) return App.toast("Enter a valid vehicle number.", "bad");
+    Data.update("ewaybills", updatingId, { vehicleNo: v });
+    App.closeModal("vehicleModal");
+    App.toast("Vehicle updated to " + v + ".");
+    renderList();
+  });
+
+  // Give the demo tenant one e-Way Bill against its latest large invoice so the list isn't empty.
+  (function seedOnce() {
+    if (Data.list("ewaybills").length || tenant.tenantId !== Data.DEMO_TENANT) return;
+    var big = invoices().sort(function (a, b) { return b.total - a.total; })[0];
+    if (!big) return;
+    var g = new Date(); g.setHours(g.getHours() - 5);
+    Data.add("ewaybills", { ewbNo: "331009876543", voucherId: big.id, invoiceNumber: big.number, party: big.party, value: big.total, fromPin: "600040", toPlace: big.partyState, toPin: "560001", subType: "Supply", mode: "Road", distance: 350, vehicleNo: "TN09BX4521", vehicleType: "Regular", transporter: "VRL Logistics", transporterId: "", generatedAt: g.toISOString(), validUntil: validUntil(2), status: "Active" });
+  })();
+
+  fillInvoices(); preview(); renderStats(); renderList();
+</script>
+</body>
+</html>

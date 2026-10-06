@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Payment &amp; Receipt · Tally Suite</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<div class="layout">
+  <aside id="sidebar"></aside>
+  <div class="main">
+    <header id="topbar"></header>
+    <main class="content">
+
+      <div class="page-head">
+        <h1>Payment &amp; Receipt</h1>
+        <div class="segmented" id="typeTabs">
+          <button class="active" data-type="Payment"><span data-icon="trendDown"></span>Payment <kbd class="mono" style="font-size:10px;opacity:.6">F5</kbd></button>
+          <button data-type="Receipt"><span data-icon="trendUp"></span>Receipt <kbd class="mono" style="font-size:10px;opacity:.6">F6</kbd></button>
+        </div>
+      </div>
+
+      <div class="stat-grid" id="statGrid"></div>
+
+      <div class="grid grid-main-side">
+        <form class="card" id="voucherForm" novalidate data-perm="create">
+          <div class="card-head">
+            <div class="card-title"><span class="ct-icon" data-icon="edit"></span><div id="formTitle">Payment Transaction</div></div>
+            <span class="badge badge-brand plain mono" id="vNumber"></span>
+          </div>
+          <div class="card-body">
+            <div class="field-grid">
+              <div class="field">
+                <label for="vDate">Date <span class="req">*</span></label>
+                <input type="date" id="vDate">
+              </div>
+              <div class="field">
+                <label for="vAccount" id="vAccountLabel">Paid From (Cash / Bank) <span class="req">*</span></label>
+                <select id="vAccount"></select>
+                <span class="field-hint" id="accountBal"></span>
+              </div>
+              <div class="field full">
+                <label for="vParty" id="vPartyLabel">Paid To (Ledger) <span class="req">*</span></label>
+                <select id="vParty"></select>
+                <span class="field-hint" id="partyBal"></span>
+                <span class="err-msg" id="errVParty">Select a ledger.</span>
+              </div>
+              <div class="field">
+                <label for="vAmount">Amount (₹) <span class="req">*</span></label>
+                <input type="number" id="vAmount" min="0" step="0.01" placeholder="0.00" style="font-family:var(--mono);font-size:16px;font-weight:700">
+                <span class="err-msg" id="errVAmount">Enter an amount greater than zero.</span>
+              </div>
+              <div class="field">
+                <label for="vMode">Mode</label>
+                <select id="vMode"><option>Cash</option><option>Cheque</option><option>UPI</option><option selected>NEFT</option><option>RTGS</option><option>IMPS</option></select>
+              </div>
+              <div class="field">
+                <label for="vRef" id="vRefLabel">UTR / Reference No.</label>
+                <input type="text" id="vRef" placeholder="Optional">
+              </div>
+              <div class="field" id="chequeDateField" style="display:none">
+                <label for="vChequeDate">Cheque Date</label>
+                <input type="date" id="vChequeDate">
+              </div>
+              <div class="field full">
+                <label for="vNarration">Narration</label>
+                <input type="text" id="vNarration" placeholder="Being amount paid…">
+              </div>
+            </div>
+            <div class="muted" id="amountWords" style="margin-top:14px;font-size:12.5px;font-style:italic"></div>
+          </div>
+          <div class="card-foot">
+            <button type="button" class="btn btn-ghost" id="resetBtn">Clear</button>
+            <button type="submit" class="btn btn-primary"><span data-icon="check"></span>Save Transaction</button>
+          </div>
+        </form>
+
+        <div class="card">
+          <div class="card-head"><div class="card-title"><span class="ct-icon" data-icon="wallet"></span><div>Cash &amp; Bank<small>Live closing balances</small></div></div></div>
+          <div class="list" id="balanceList"></div>
+        </div>
+      </div>
+
+      <div class="card mt">
+        <div class="card-head">
+          <div class="card-title"><span class="ct-icon" data-icon="ledger"></span><div id="registerTitle">Register</div></div>
+          <div class="toolbar">
+            <div class="search-box"><span data-icon="search"></span><input type="text" id="regSearch" placeholder="Search…"></div>
+            <select class="select-sm" id="regMode"><option value="">All modes</option><option>Cash</option><option>Cheque</option><option>UPI</option><option>NEFT</option><option>RTGS</option><option>IMPS</option></select>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="table stack-sm">
+            <thead><tr><th>Transaction No.</th><th>Date</th><th>Ledger</th><th>Cash / Bank</th><th>Mode</th><th>Reference</th><th class="num">Amount</th><th></th></tr></thead>
+            <tbody id="regBody"></tbody>
+            <tfoot id="regFoot"></tfoot>
+          </table>
+        </div>
+          <div id="regPager"></div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+<script src="assets/js/tally.js"></script>
+<script>
+  var tenant = App.renderShell({ active: "paymentreceipt", title: "Payment & Receipt", subtitle: "Transactions · Cash & bank" });
+  var $ = function (id) { return document.getElementById(id); };
+  var regPg = App.pager("regPager", renderRegister, { resetOn: ["#typeTabs"] });
+  var type = new URLSearchParams(location.search).get("type") === "Receipt" ? "Receipt" : "Payment";
+
+  function balText(n) { return App.inr(Math.abs(n)) + " " + (n >= 0 ? "Dr" : "Cr"); }
+  function cashBank() { return App.ledgersIn(["Cash-in-Hand", "Bank Accounts"]); }
+  function otherLedgers() {
+    var cb = cashBank().map(function (l) { return l.name; });
+    return Data.list("ledgers").filter(function (l) { return cb.indexOf(l.name) === -1; });
+  }
+
+  function setType(t) {
+    type = t;
+    var pay = t === "Payment";
+    $("typeTabs").querySelectorAll("button").forEach(function (b) { b.classList.toggle("active", b.dataset.type === t); });
+    $("formTitle").innerHTML = t + " Transaction<small>" + (pay ? "Dr ledger · Cr cash/bank" : "Dr cash/bank · Cr ledger") + "</small>";
+    $("vAccountLabel").innerHTML = (pay ? "Paid From" : "Received In") + ' (Cash / Bank) <span class="req">*</span>';
+    $("vPartyLabel").innerHTML = (pay ? "Paid To" : "Received From") + ' (Ledger) <span class="req">*</span>';
+    $("vNarration").placeholder = pay ? "Being amount paid…" : "Being amount received…";
+    resetForm(); renderStats(); renderRegister();
+  }
+
+  function resetForm() {
+    $("vDate").value = App.today();
+    $("vAccount").innerHTML = App.ledgerOptions(cashBank(), "HDFC Bank A/c");
+    if (!$("vAccount").value && cashBank()[0]) $("vAccount").value = cashBank()[0].name;
+    $("vParty").innerHTML = App.ledgerOptions(otherLedgers(), "", "Select ledger");
+    $("vAmount").value = ""; $("vRef").value = ""; $("vNarration").value = ""; $("vMode").value = "NEFT";
+    ["vParty", "vAmount"].forEach(function (id) { $(id).classList.remove("error"); });
+    $("errVParty").classList.remove("show"); $("errVAmount").classList.remove("show");
+    $("vNumber").textContent = Data.nextNumber(type, $("vDate").value);
+    syncHints();
+  }
+
+  function syncHints() {
+    $("accountBal").textContent = $("vAccount").value ? "Balance: " + balText(Data.ledgerBalance($("vAccount").value)) : "";
+    $("partyBal").textContent = $("vParty").value ? "Current balance: " + balText(Data.ledgerBalance($("vParty").value)) : "";
+    var amt = Number($("vAmount").value);
+    $("amountWords").textContent = amt > 0 ? App.amountInWords(amt) : "";
+    var cheque = $("vMode").value === "Cheque";
+    $("chequeDateField").style.display = cheque ? "" : "none";
+    $("vRefLabel").textContent = cheque ? "Cheque No." : $("vMode").value === "Cash" ? "Receipt / Slip No." : "UTR / Reference No.";
+  }
+  ["vAccount", "vParty", "vAmount", "vMode"].forEach(function (id) { $(id).addEventListener("input", syncHints); $(id).addEventListener("change", syncHints); });
+
+  $("typeTabs").addEventListener("click", function (e) { var b = e.target.closest("button"); if (b) setType(b.dataset.type); });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "F5") { e.preventDefault(); setType("Payment"); }
+    if (e.key === "F6") { e.preventDefault(); setType("Receipt"); }
+  });
+  $("resetBtn").addEventListener("click", resetForm);
+
+  $("voucherForm").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var amt = Number($("vAmount").value);
+    var okP = !!$("vParty").value, okA = amt > 0;
+    $("vParty").classList.toggle("error", !okP); $("errVParty").classList.toggle("show", !okP);
+    $("vAmount").classList.toggle("error", !okA); $("errVAmount").classList.toggle("show", !okA);
+    if (!okP || !okA) return App.toast("Please complete the highlighted fields.", "bad");
+
+    var v = Data.addVoucher({
+      type: type, date: $("vDate").value, party: $("vParty").value, account: $("vAccount").value,
+      total: amt, mode: $("vMode").value, ref: $("vRef").value.trim(),
+      chequeDate: $("vMode").value === "Cheque" ? $("vChequeDate").value : "", narration: $("vNarration").value.trim()
+    });
+    App.toast(type + " " + v.number + " recorded · " + App.inr(amt));
+    resetForm(); renderStats(); renderRegister();
+  });
+
+  function ofType() { return Data.list("vouchers").filter(function (v) { return v.type === type; }); }
+
+  function renderStats() {
+    var vs = ofType(), pay = type === "Payment", m = App.today().slice(0, 7);
+    var total = vs.reduce(function (s, v) { return s + v.total; }, 0);
+    var cash = App.ledgersIn(["Cash-in-Hand"]).reduce(function (s, l) { return s + Data.ledgerBalance(l.name); }, 0);
+    var bank = App.ledgersIn(["Bank Accounts"]).reduce(function (s, l) { return s + Data.ledgerBalance(l.name); }, 0);
+    var items = [
+      { label: "Total " + type + "s", value: App.compactInr(total), sub: vs.length + " transactions", icon: pay ? "trendDown" : "trendUp", tone: pay ? "bad" : "good" },
+      { label: "This Month", value: App.compactInr(vs.filter(function (v) { return v.date.indexOf(m) === 0; }).reduce(function (s, v) { return s + v.total; }, 0)), sub: new Date().toLocaleDateString("en-IN", { month: "long" }), icon: "calendar", tone: "info" },
+      { label: "Cash in Hand", value: App.compactInr(cash), sub: "Cash ledgers", icon: "wallet", tone: "warn" },
+      { label: "Bank Balance", value: App.compactInr(bank), sub: "All bank accounts", icon: "building", tone: "brand" }
+    ];
+    $("statGrid").innerHTML = items.map(function (s) {
+      return '<div class="stat-card" style="--tint:var(--' + s.tone + ')"><div class="stat-top"><span class="stat-label">' + s.label + '</span><span class="stat-icon tone-' + s.tone + '">' + App.icon(s.icon) + '</span></div><div class="stat-value">' + s.value + '</div><div class="stat-sub">' + s.sub + "</div></div>";
+    }).join("");
+
+    $("balanceList").innerHTML = cashBank().map(function (l) {
+      var b = Data.ledgerBalance(l.name), isCash = l.group === "Cash-in-Hand";
+      return '<div class="list-item"><span class="list-icon tone-' + (isCash ? "warn" : "brand") + '">' + App.icon(isCash ? "wallet" : "building") + '</span><div class="list-main"><strong>' + App.esc(l.name) + "</strong><span>" + l.group + '</span></div><span class="num" style="font-weight:800;color:' + (b < 0 ? "var(--bad)" : "inherit") + '">' + balText(b) + "</span></div>";
+    }).join("");
+  }
+
+  function renderRegister() {
+    var q = $("regSearch").value.trim().toLowerCase(), mode = $("regMode").value;
+    var rows = ofType().filter(function (v) {
+      return (!mode || v.mode === mode) && (!q || (v.number + v.party + v.account + (v.ref || "")).toLowerCase().indexOf(q) !== -1);
+    }).sort(function (a, b) { return b.date.localeCompare(a.date) || b.number.localeCompare(a.number); });
+    $("registerTitle").innerHTML = type + " Register<small>" + rows.length + " transactions</small>";
+    var rowsPage = regPg.slice(rows);
+    $("regBody").innerHTML = rowsPage.length ? rowsPage.map(function (v) {
+      return '<tr><td class="mono cell-strong">' + v.number + (v.source === "statement" ? ' <span class="badge badge-info plain" style="font-size:10px">statement</span>' : "") + "</td><td>" + App.date(v.date) + "</td>" +
+        "<td><span class='cell-strong'>" + App.esc(v.party) + "</span>" + (v.narration ? "<span class='cell-sub'>" + App.esc(v.narration) + "</span>" : "") + "</td>" +
+        "<td>" + App.esc(v.account) + '</td><td><span class="badge badge-muted plain">' + App.esc(v.mode || "—") + "</span></td><td class='mono' style='font-size:12px'>" + App.esc(v.ref || "—") + "</td>" +
+        '<td class="num cell-strong" style="color:' + (type === "Payment" ? "var(--bad)" : "var(--good)") + '">' + App.inr(v.total) + "</td>" +
+        '<td><div class="row-actions"><button class="btn btn-danger btn-xs" data-perm="delete" data-del="' + v.id + '">' + App.icon("trash") + "</button></div></td></tr>";
+    }).join("") : App.emptyRow(8, "No " + type.toLowerCase() + "s yet", "Record one using the form above.");
+    var tot = rows.reduce(function (s, v) { return s + v.total; }, 0);
+    $("regFoot").innerHTML = rows.length ? '<tr><td colspan="6">Total · ' + rows.length + ' entries</td><td class="num">' + App.inr(tot) + "</td><td></td></tr>" : "";
+  }
+  $("regSearch").addEventListener("input", renderRegister);
+  $("regMode").addEventListener("change", renderRegister);
+  $("regBody").addEventListener("click", function (e) {
+    var b = e.target.closest("[data-del]");
+    if (!b) return;
+    App.confirm({ title: "Delete transaction?", message: "Ledger balances will be updated.", ok: "Delete", danger: true }).then(function (ok) {
+      if (!ok) return;
+      Data.remove("vouchers", b.dataset.del);
+      App.toast("Transaction deleted.");
+      renderStats(); renderRegister(); syncHints();
+    });
+  });
+
+  setType(type);
+</script>
+</body>
+</html>

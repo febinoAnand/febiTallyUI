@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Invoice &amp; Quotation · Tally Suite</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<div class="layout">
+  <aside id="sidebar"></aside>
+  <div class="main">
+    <header id="topbar"></header>
+    <main class="content">
+
+      <div class="page-head">
+        <h1>Invoice / Quotation</h1>
+        <div class="page-actions" id="listActions">
+          <button class="btn btn-outline" id="newQuoteBtn" data-perm="create"><span data-icon="file"></span>New Quotation</button>
+          <button class="btn btn-primary" id="newInvoiceBtn" data-perm="create"><span data-icon="plus"></span>New Invoice</button>
+        </div>
+      </div>
+
+      <!-- ============ LIST VIEW ============ -->
+      <section id="listView">
+        <div class="stat-grid" id="statGrid"></div>
+        <div class="card">
+          <div class="card-head">
+            <div class="segmented" id="docTabs">
+              <button class="active" data-tab="invoice"><span data-icon="invoice"></span>Invoices</button>
+              <button data-tab="quotation"><span data-icon="file"></span>Quotations</button>
+            </div>
+            <div class="toolbar">
+              <div class="search-box"><span data-icon="search"></span><input type="text" id="docSearch" placeholder="Search number or party…"></div>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="table stack-sm">
+              <thead id="docHead"></thead>
+              <tbody id="docBody"></tbody>
+            </table>
+          </div>
+          <div id="docPager"></div>
+        </div>
+      </section>
+
+      <!-- ============ EDITOR VIEW ============ -->
+      <section id="editorView" class="hidden">
+        <div class="grid grid-2">
+          <form class="card" id="docForm" novalidate>
+            <div class="card-head">
+              <div class="card-title"><span class="ct-icon" data-icon="edit"></span><div id="editorTitle">New Invoice<small>Fill in the party and items</small></div></div>
+              <span class="badge badge-brand plain mono" id="docNumber"></span>
+            </div>
+            <div class="card-body">
+              <div class="field-grid cols-3">
+                <div class="field full">
+                  <label for="dParty">Party (Customer) <span class="req">*</span></label>
+                  <select id="dParty"></select>
+                  <span class="err-msg" id="errDParty">Select a customer ledger.</span>
+                </div>
+                <div class="field">
+                  <label for="dDate">Date <span class="req">*</span></label>
+                  <input type="date" id="dDate">
+                </div>
+                <div class="field">
+                  <label for="dDue" id="dDueLabel">Due Date</label>
+                  <input type="date" id="dDue">
+                </div>
+                <div class="field">
+                  <label for="dState">Place of Supply</label>
+                  <select id="dState"></select>
+                </div>
+                <div class="field full">
+                  <label for="dGstin">Party GSTIN</label>
+                  <input type="text" id="dGstin" maxlength="15" placeholder="Unregistered / B2C" style="text-transform:uppercase">
+                </div>
+              </div>
+
+              <div class="table-wrap" style="margin:22px -20px 0;border-top:1px solid var(--border)">
+                <table class="table stack-sm">
+                  <thead><tr><th>Item</th><th>HSN</th><th class="num">Qty</th><th class="num">Rate</th><th>GST</th><th class="num">Amount</th><th></th></tr></thead>
+                  <tbody id="itemBody"></tbody>
+                </table>
+              </div>
+              <button type="button" class="btn btn-ghost btn-sm" id="addItemBtn" style="margin-top:10px"><span data-icon="plus"></span>Add line</button>
+              <span class="err-msg" id="errItems">Add at least one item with quantity and rate.</span>
+
+              <div style="display:flex;gap:24px;flex-wrap:wrap;margin-top:18px">
+                <div class="field" style="flex:1;min-width:220px">
+                  <label for="dNotes">Notes / Terms</label>
+                  <textarea id="dNotes" placeholder="e.g. Payment due within 15 days"></textarea>
+                </div>
+                <div class="totals" id="totals"></div>
+              </div>
+            </div>
+            <div class="card-foot">
+              <button type="button" class="btn btn-ghost" id="cancelBtn">Cancel</button>
+              <button type="submit" class="btn btn-primary" id="saveBtn"><span data-icon="check"></span>Save</button>
+            </div>
+          </form>
+
+          <div>
+            <div class="card-title" style="margin-bottom:12px"><span class="ct-icon" data-icon="eye"></span><div>Live preview<small>Updates as you type</small></div></div>
+            <div id="livePreview"></div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<!-- View modal -->
+<div class="modal-overlay" id="viewModal">
+  <div class="modal lg">
+    <div class="modal-head"><h3 id="viewTitle">Document</h3><button class="icon-btn" data-close="viewModal" data-icon="x"></button></div>
+    <div class="modal-body" id="viewBody" style="background:var(--surface-2)"></div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" data-close="viewModal">Close</button>
+      <button class="btn btn-primary" id="printBtn"><span data-icon="printer"></span>Print</button>
+    </div>
+  </div>
+</div>
+
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+<script src="assets/js/tally.js"></script>
+<script src="assets/js/items.js"></script>
+<script>
+  var tenant = App.renderShell({ active: "invoice", title: "Invoice / Quotation", subtitle: "Documents · GST billing" });
+  var $ = function (id) { return document.getElementById(id); };
+  var docPg = App.pager("docPager", renderList, {});
+  var tab = "invoice", mode = "invoice", fromQuoteId = null, printHtml = "";
+
+  $("dState").innerHTML = Data.INDIAN_STATES.map(function (s) { return "<option>" + s + "</option>"; }).join("");
+
+  /* ---------------- List ---------------- */
+  function invoices() { return Data.list("vouchers").filter(function (v) { return v.type === "Sales"; }); }
+
+  function renderStats() {
+    var inv = invoices(), qs = Data.list("quotations");
+    var items = [
+      { label: "Invoices", value: inv.length, sub: App.compactInr(inv.reduce(function (s, v) { return s + v.total; }, 0)) + " billed", icon: "invoice", tone: "brand" },
+      { label: "Open Quotations", value: qs.filter(function (q) { return q.status === "Open"; }).length, sub: "Awaiting customer", icon: "file", tone: "warn" },
+      { label: "Converted", value: qs.filter(function (q) { return q.status === "Converted"; }).length, sub: "Quotations to invoices", icon: "checkCircle", tone: "good" },
+      { label: "GST Collected", value: App.compactInr(inv.reduce(function (s, v) { return s + v.cgst + v.sgst + v.igst; }, 0)), sub: "Output tax", icon: "rupee", tone: "info" }
+    ];
+    $("statGrid").innerHTML = items.map(function (s) {
+      return '<div class="stat-card" style="--tint:var(--' + s.tone + ')"><div class="stat-top"><span class="stat-label">' + s.label + '</span><span class="stat-icon tone-' + s.tone + '">' + App.icon(s.icon) + '</span></div><div class="stat-value">' + s.value + '</div><div class="stat-sub">' + s.sub + "</div></div>";
+    }).join("");
+  }
+
+  function renderList() {
+    var q = $("docSearch").value.trim().toLowerCase();
+    var match = function (d) { return !q || d.number.toLowerCase().indexOf(q) !== -1 || d.party.toLowerCase().indexOf(q) !== -1; };
+    var sortDesc = function (a, b) { return b.date.localeCompare(a.date) || b.number.localeCompare(a.number); };
+
+    if (tab === "invoice") {
+      $("docHead").innerHTML = "<tr><th>Invoice No.</th><th>Date</th><th>Party</th><th>Tax type</th><th class='num'>Amount</th><th>e-Invoice</th><th></th></tr>";
+      var rows = invoices().filter(match).sort(sortDesc);
+      var rowsPage = docPg.slice(rows);
+      $("docBody").innerHTML = rowsPage.length ? rowsPage.map(function (v) {
+        var e = v.einvoice && v.einvoice.status;
+        return '<tr><td class="mono cell-strong">' + v.number + "</td><td>" + App.date(v.date) + "</td><td><span class='cell-strong'>" + App.esc(v.party) + "</span><span class='cell-sub'>" + App.esc(v.partyState || "") + "</span></td>" +
+          '<td><span class="badge badge-muted plain">' + (v.igst ? "IGST" : "CGST+SGST") + '</span></td><td class="num cell-strong">' + App.inr(v.total) + "</td>" +
+          "<td>" + (e === "Generated" ? '<span class="badge badge-good">IRN generated</span>' : e === "Cancelled" ? '<span class="badge badge-bad">Cancelled</span>' : '<span class="badge badge-warn">Pending</span>') + "</td>" +
+          '<td><div class="row-actions"><button class="btn btn-ghost btn-xs" data-view-inv="' + v.id + '">' + App.icon("eye") + "View</button></div></td></tr>";
+      }).join("") : App.emptyRow(7, "No invoices yet", "Click “New Invoice” to bill your first customer.");
+    } else {
+      $("docHead").innerHTML = "<tr><th>Quotation No.</th><th>Date</th><th>Valid till</th><th>Party</th><th class='num'>Amount</th><th>Status</th><th></th></tr>";
+      var qrows = Data.list("quotations").filter(match).sort(sortDesc);
+      var qrowsPage = docPg.slice(qrows);
+      $("docBody").innerHTML = qrowsPage.length ? qrowsPage.map(function (d) {
+        var expired = d.status === "Open" && d.validTill && d.validTill < App.today();
+        var status = expired ? '<span class="badge badge-bad">Expired</span>' : d.status === "Converted" ? '<span class="badge badge-good">Converted</span>' : '<span class="badge badge-info">Open</span>';
+        return '<tr><td class="mono cell-strong">' + d.number + "</td><td>" + App.date(d.date) + "</td><td>" + App.date(d.validTill) + "</td><td class='cell-strong'>" + App.esc(d.party) + '</td><td class="num cell-strong">' + App.inr(d.total) + "</td><td>" + status + "</td>" +
+          '<td><div class="row-actions"><button class="btn btn-ghost btn-xs" data-view-q="' + d.id + '">' + App.icon("eye") + "</button>" +
+          (d.status === "Open" ? '<button class="btn btn-accent btn-xs" data-perm="create" data-convert="' + d.id + '">' + App.icon("arrowRight") + "To Invoice</button>" : "") +
+          '<button class="btn btn-danger btn-xs" data-perm="delete" data-del-q="' + d.id + '">' + App.icon("trash") + "</button></div></td></tr>";
+      }).join("") : App.emptyRow(7, "No quotations yet", "Click “New Quotation” to send a price quote.");
+    }
+  }
+
+  $("docTabs").addEventListener("click", function (e) {
+    var b = e.target.closest("button");
+    if (!b) return;
+    tab = b.dataset.tab;
+    $("docTabs").querySelectorAll("button").forEach(function (x) { x.classList.toggle("active", x === b); });
+    renderList();
+  });
+  $("docSearch").addEventListener("input", renderList);
+
+  $("docBody").addEventListener("click", function (e) {
+    var b = e.target.closest("button");
+    if (!b) return;
+    if (b.dataset.viewInv) showDoc(Data.get("vouchers", b.dataset.viewInv), "TAX INVOICE");
+    if (b.dataset.viewQ) showDoc(Data.get("quotations", b.dataset.viewQ), "QUOTATION");
+    if (b.dataset.convert) openEditor("invoice", Data.get("quotations", b.dataset.convert));
+    if (b.dataset.delQ) {
+      var qid = b.dataset.delQ;
+      App.confirm({ title: "Delete quotation?", ok: "Delete", danger: true }).then(function (ok) {
+        if (ok) { Data.remove("quotations", qid); App.toast("Quotation deleted."); refresh(); }
+      });
+    }
+  });
+
+  function showDoc(doc, title) {
+    $("viewTitle").textContent = title.charAt(0) + title.slice(1).toLowerCase() + " · " + doc.number;
+    printHtml = Items.preview(doc, tenant, title);
+    $("viewBody").innerHTML = printHtml;
+    App.openModal("viewModal");
+  }
+  $("printBtn").addEventListener("click", function () { Items.print(printHtml); });
+
+  /* ---------------- Editor ---------------- */
+  var editor = Items.editor($("itemBody"), updatePreview);
+  $("addItemBtn").addEventListener("click", function () { editor.addRow({}).querySelector(".it-name").focus(); });
+
+  function customers() { return App.ledgersIn(["Sundry Debtors"]); }
+
+  function addDays(dateStr, n) {
+    var d = new Date(dateStr); d.setDate(d.getDate() + n);
+    return d.toISOString().slice(0, 10);
+  }
+
+  function openEditor(kind, quote) {
+    mode = kind;
+    fromQuoteId = quote ? quote.id : null;
+    var isInv = kind === "invoice";
+    $("editorTitle").innerHTML = (quote ? "Convert " + quote.number + " to Invoice" : isInv ? "New Invoice" : "New Quotation") + "<small>" + (isInv ? "Saving posts a Sales transaction" : "Quotations don't affect your books") + "</small>";
+    $("dDueLabel").textContent = isInv ? "Due Date" : "Valid Till";
+    $("dParty").innerHTML = App.ledgerOptions(customers(), quote ? quote.party : "", "Select customer");
+    $("dDate").value = App.today();
+    $("dDue").value = addDays(App.today(), 15);
+    $("dState").value = quote ? quote.partyState : tenant.state;
+    $("dGstin").value = quote ? quote.partyGstin || "" : "";
+    $("dNotes").value = quote ? quote.notes || "" : "";
+    editor.setItems(quote ? quote.items : []);
+    $("docNumber").textContent = Data.nextNumber(isInv ? "Sales" : "Quotation", $("dDate").value);
+    ["dParty"].forEach(function (id) { $(id).classList.remove("error"); });
+    $("errDParty").classList.remove("show"); $("errItems").classList.remove("show");
+    $("listView").classList.add("hidden"); $("listActions").classList.add("hidden");
+    $("editorView").classList.remove("hidden");
+    updatePreview();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+  function closeEditor() {
+    $("editorView").classList.add("hidden");
+    $("listView").classList.remove("hidden"); $("listActions").classList.remove("hidden");
+    refresh();
+  }
+
+  $("dParty").addEventListener("change", function () {
+    var l = App.findLedger(this.value);
+    if (l) { $("dGstin").value = l.gstin || ""; if (l.state) $("dState").value = l.state; }
+    this.classList.remove("error"); $("errDParty").classList.remove("show");
+    updatePreview();
+  });
+  ["dDate", "dDue", "dState", "dGstin", "dNotes"].forEach(function (id) { $(id).addEventListener("input", updatePreview); });
+
+  function currentDoc() {
+    var isInv = mode === "invoice";
+    return {
+      number: $("docNumber").textContent,
+      date: $("dDate").value,
+      dueDate: isInv ? $("dDue").value : undefined,
+      validTill: isInv ? undefined : $("dDue").value,
+      party: $("dParty").value,
+      partyState: $("dState").value,
+      partyGstin: $("dGstin").value.trim().toUpperCase(),
+      items: editor.getItems(),
+      notes: $("dNotes").value.trim()
+    };
+  }
+  function updatePreview() {
+    if ($("editorView").classList.contains("hidden")) return;
+    var doc = currentDoc();
+    $("totals").innerHTML = Items.totalsHtml(Data.computeTotals(doc.items, doc.partyState));
+    $("livePreview").innerHTML = Items.preview(doc, tenant, mode === "invoice" ? "TAX INVOICE" : "QUOTATION");
+  }
+
+  $("newInvoiceBtn").addEventListener("click", function () { openEditor("invoice"); });
+  $("newQuoteBtn").addEventListener("click", function () { openEditor("quotation"); });
+  $("cancelBtn").addEventListener("click", closeEditor);
+
+  $("docForm").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var doc = currentDoc();
+    var okParty = !!doc.party, okItems = doc.items.length > 0 && doc.items.every(function (i) { return i.rate > 0; });
+    $("dParty").classList.toggle("error", !okParty); $("errDParty").classList.toggle("show", !okParty);
+    $("errItems").classList.toggle("show", !okItems);
+    if (!okParty || !okItems) return App.toast("Please complete the highlighted fields.", "bad");
+
+    if (mode === "invoice") {
+      var v = Data.addVoucher({
+        type: "Sales", date: doc.date, dueDate: doc.dueDate, party: doc.party, partyState: doc.partyState, partyGstin: doc.partyGstin,
+        account: "Sales Account", items: doc.items, narration: doc.notes, source: "invoice", quotationRef: fromQuoteId
+      });
+      if (fromQuoteId) Data.update("quotations", fromQuoteId, { status: "Converted", invoiceNumber: v.number });
+      App.toast("Invoice " + v.number + " saved and posted to Sales.");
+      tab = "invoice";
+    } else {
+      var q = Object.assign(doc, Data.computeTotals(doc.items, doc.partyState), { number: Data.nextNumber("Quotation", doc.date), status: "Open" });
+      Data.add("quotations", q);
+      App.toast("Quotation " + q.number + " saved.");
+      tab = "quotation";
+    }
+    $("docTabs").querySelectorAll("button").forEach(function (x) { x.classList.toggle("active", x.dataset.tab === tab); });
+    closeEditor();
+  });
+
+  function refresh() { renderStats(); renderList(); }
+  refresh();
+</script>
+</body>
+</html>

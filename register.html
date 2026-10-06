@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Register Company · Tally Suite</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+<style>
+  .entry.reg { grid-template-columns: minmax(0, 0.7fr) minmax(0, 1.3fr); }
+  .reg-steps { list-style: none; margin: 0; padding: 0; counter-reset: s; max-width: 380px; }
+  .reg-steps li { counter-increment: s; position: relative; padding: 0 0 22px 46px; color: #a7f3d0; font-size: 13px; }
+  .reg-steps li::before { content: counter(s, decimal-leading-zero); position: absolute; left: 0; top: -2px; font: 600 20px var(--mono); color: #fbbf24; }
+  .reg-steps li strong { display: block; color: #fff; font-size: 14.5px; margin-bottom: 2px; }
+  @media (max-width: 960px) { .entry.reg { grid-template-columns: minmax(0, 1fr); } .reg-steps { display: none; } }
+</style>
+</head>
+<body>
+
+<div class="entry reg">
+  <aside class="entry-art">
+    <div class="entry-brand">
+      <span class="mark">T</span>
+      <div><strong>Tally Suite</strong><span>CLOUD ACCOUNTING</span></div>
+    </div>
+
+    <h2>Open a new <em>set of books</em> for your company.</h2>
+    <p class="entry-lead">Each company is its own tenant, with its own Company ID, users and data.</p>
+
+    <ol class="reg-steps">
+      <li><strong>Register</strong>Tell us about your company and admin login.</li>
+      <li><strong>Verify email</strong>Confirm the link we send to your inbox.</li>
+      <li><strong>Get your Company ID</strong>Your team signs in with it once the company is approved.</li>
+    </ol>
+
+    <div class="entry-foot"><span>Statement import</span><span>GST invoices</span><span>Transactions</span><span>e-Commerce</span></div>
+  </aside>
+
+  <main class="entry-main">
+    <div class="entry-form wide">
+      <div class="entry-kicker">Step 1 of 3 · Register</div>
+      <h1 class="entry-title">Register your company</h1>
+      <p class="entry-sub">It takes about a minute. Fields marked <span class="req">*</span> are required.</p>
+
+      <div class="alert-bar" id="formAlert">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="13"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span id="formAlertText">Please fix the errors below.</span>
+      </div>
+
+      <form id="registerForm" novalidate>
+        <div class="field-grid">
+          <div class="section-label">Admin login</div>
+
+          <div class="field">
+            <label for="rUsername">Username <span class="req">*</span></label>
+            <input type="text" id="rUsername" placeholder="e.g. admin">
+            <span class="err-msg" id="errRUsername">Choose a username (min 3 characters).</span>
+          </div>
+          <div class="field">
+            <label for="rEmail">Email Address <span class="req">*</span></label>
+            <input type="email" id="rEmail" placeholder="accounts@company.in">
+            <span class="err-msg" id="errREmail">Enter a valid email address.</span>
+          </div>
+          <div class="field">
+            <label for="rPassword">Password <span class="req">*</span></label>
+            <div class="pw-wrap">
+              <input type="password" id="rPassword" placeholder="At least 6 characters">
+              <button type="button" class="pw-toggle" data-toggle="rPassword">Show</button>
+            </div>
+            <div class="strength" id="pwStrength"><span></span><span></span><span></span><span></span></div>
+            <span class="strength-label" id="pwStrengthLabel">&nbsp;</span>
+            <span class="err-msg" id="errRPassword">Password must be at least 6 characters.</span>
+          </div>
+          <div class="field">
+            <label for="rConfirm">Confirm Password <span class="req">*</span></label>
+            <div class="pw-wrap">
+              <input type="password" id="rConfirm" placeholder="Re-enter password">
+              <button type="button" class="pw-toggle" data-toggle="rConfirm">Show</button>
+            </div>
+            <span class="err-msg" id="errRConfirm">Passwords do not match.</span>
+          </div>
+
+          <div class="section-label">Company details</div>
+
+          <div class="field full">
+            <label for="rCompany">Company Name <span class="req">*</span></label>
+            <input type="text" id="rCompany" placeholder="e.g. Sri Ram Traders Pvt Ltd">
+            <span class="err-msg" id="errRCompany">Enter your company name.</span>
+          </div>
+          <div class="field">
+            <label for="rGstin">GSTIN</label>
+            <input type="text" id="rGstin" maxlength="15" placeholder="33ABCDE1234F1Z5" class="mono" style="text-transform:uppercase">
+            <span class="field-hint">Optional. Needed later for e-Invoice and e-Way Bill.</span>
+            <span class="err-msg" id="errRGstin">GSTIN must be 15 characters (e.g. 33ABCDE1234F1Z5).</span>
+          </div>
+          <div class="field">
+            <label for="rState">State <span class="req">*</span></label>
+            <select id="rState"></select>
+            <span class="err-msg" id="errRState">Select your state.</span>
+          </div>
+          <div class="field">
+            <label for="rContact">Contact Number <span class="req">*</span></label>
+            <input type="text" id="rContact" maxlength="10" placeholder="10-digit mobile">
+            <span class="err-msg" id="errRContact">Enter a valid 10-digit number.</span>
+          </div>
+          <div class="field">
+            <label for="rType">Business Type <span class="req">*</span></label>
+            <select id="rType">
+              <option value="">Select type</option>
+              <option>Trading</option>
+              <option>Retail</option>
+              <option>Manufacturing</option>
+              <option>Services</option>
+              <option>E-Commerce Seller</option>
+            </select>
+            <span class="err-msg" id="errRType">Select a business type.</span>
+          </div>
+          <div class="field full">
+            <label for="rFy">Financial Year Starts From <span class="req">*</span></label>
+            <input type="date" id="rFy">
+            <span class="err-msg" id="errRFy">Pick the start of your financial year.</span>
+          </div>
+          <div class="field full">
+            <label class="checkbox"><input type="checkbox" id="rTerms"> I agree to the Terms of Service and Privacy Policy</label>
+            <span class="err-msg" id="errRTerms">Please accept the terms to continue.</span>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary entry-submit" style="margin-top:22px">Continue to email verification</button>
+      </form>
+
+      <div class="entry-switch">Already have a Company ID? <a href="index.html">Sign in →</a></div>
+    </div>
+  </main>
+</div>
+
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+  var $ = function (id) { return document.getElementById(id); };
+  var fields = ["rUsername", "rEmail", "rPassword", "rConfirm", "rCompany", "rGstin", "rState", "rContact", "rType", "rFy"].map($);
+  var formAlert = $("formAlert");
+
+  $("rState").innerHTML = '<option value="">Select state</option>' + Data.INDIAN_STATES.map(function (s) { return "<option>" + s + "</option>"; }).join("");
+  $("rFy").value = "2026-04-01";
+
+  document.querySelectorAll("[data-toggle]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var input = $(btn.getAttribute("data-toggle"));
+      var show = input.type === "password";
+      input.type = show ? "text" : "password";
+      btn.textContent = show ? "Hide" : "Show";
+    });
+  });
+
+  // GSTIN's first two digits are the state code, so pick the state for the user.
+  var STATE_CODES = { "07": "Delhi", "09": "Uttar Pradesh", "19": "West Bengal", "24": "Gujarat", "27": "Maharashtra", "29": "Karnataka", "32": "Kerala", "33": "Tamil Nadu", "36": "Telangana", "37": "Andhra Pradesh" };
+  $("rGstin").addEventListener("input", function () {
+    var code = this.value.slice(0, 2);
+    if (STATE_CODES[code] && !$("rState").value) $("rState").value = STATE_CODES[code];
+  });
+
+  var LABELS = ["Too short", "Weak", "Fair", "Good", "Strong"];
+  $("rPassword").addEventListener("input", function () {
+    var v = this.value, bar = $("pwStrength"), score = 0;
+    bar.className = "strength";
+    if (!v) { $("pwStrengthLabel").innerHTML = "&nbsp;"; return; }
+    if (v.length >= 6) score++;
+    if (v.length >= 10) score++;
+    if (/[A-Z]/.test(v) && /[a-z]/.test(v)) score++;
+    if (/\d/.test(v) && /[^A-Za-z0-9]/.test(v)) score++;
+    var level = v.length < 6 ? 1 : Math.max(1, score);
+    bar.classList.add("s" + level);
+    $("pwStrengthLabel").textContent = v.length < 6 ? LABELS[0] : LABELS[level];
+  });
+
+  function setErr(input, errId, bad) {
+    input.classList.toggle("error", bad);
+    $(errId).classList.toggle("show", bad);
+    return !bad;
+  }
+  fields.concat([$("rTerms")]).forEach(function (el) {
+    ["input", "change"].forEach(function (ev) {
+      el.addEventListener(ev, function () { el.classList.remove("error"); formAlert.classList.remove("show"); });
+    });
+  });
+
+  // Coming back from "Edit email" on the verify screen — restore what was typed.
+  (function restore() {
+    var p;
+    try { p = JSON.parse(sessionStorage.getItem("tally_pending_registration") || "null"); } catch (e) { p = null; }
+    if (!p) return;
+    $("rUsername").value = p.username; $("rEmail").value = p.email;
+    $("rPassword").value = p.password; $("rConfirm").value = p.password;
+    $("rCompany").value = p.companyName; $("rGstin").value = p.gstin;
+    $("rState").value = p.state; $("rContact").value = p.contactNumber;
+    $("rType").value = p.businessType; $("rFy").value = p.fyStart;
+    $("rTerms").checked = true;
+    $("rPassword").dispatchEvent(new Event("input"));
+    $("rEmail").focus();
+  })();
+
+  $("registerForm").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var v = function (id) { return $(id).value.trim(); };
+    var gstin = v("rGstin").toUpperCase();
+
+    var emailErr = $("errREmail");
+    var emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v("rEmail"));
+    emailErr.textContent = "Enter a valid email address.";
+    if (emailOk && Data.isEmailTaken(v("rEmail"))) { emailOk = false; emailErr.textContent = "A tenant with this email already exists."; }
+
+    var ok = [
+      setErr($("rUsername"), "errRUsername", v("rUsername").length < 3),
+      setErr($("rEmail"), "errREmail", !emailOk),
+      setErr($("rPassword"), "errRPassword", $("rPassword").value.length < 6),
+      setErr($("rConfirm"), "errRConfirm", !$("rConfirm").value || $("rConfirm").value !== $("rPassword").value),
+      setErr($("rCompany"), "errRCompany", !v("rCompany")),
+      setErr($("rGstin"), "errRGstin", gstin !== "" && !/^\d{2}[A-Z]{5}\d{4}[A-Z][A-Z\d]Z[A-Z\d]$/.test(gstin)),
+      setErr($("rState"), "errRState", !v("rState")),
+      setErr($("rContact"), "errRContact", !/^[6-9]\d{9}$/.test(v("rContact"))),
+      setErr($("rType"), "errRType", !v("rType")),
+      setErr($("rFy"), "errRFy", !v("rFy")),
+      setErr($("rTerms"), "errRTerms", !$("rTerms").checked)
+    ].every(Boolean);
+
+    if (!ok) {
+      $("formAlertText").textContent = "Please fix the highlighted fields.";
+      formAlert.classList.add("show");
+      formAlert.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+
+    sessionStorage.setItem("tally_pending_registration", JSON.stringify({
+      username: v("rUsername"), email: v("rEmail"), password: $("rPassword").value,
+      companyName: v("rCompany"), gstin: gstin, state: v("rState"),
+      contactNumber: v("rContact"), businessType: v("rType"), fyStart: v("rFy")
+    }));
+    window.location.href = "verify-email.html";
+  });
+</script>
+</body>
+</html>

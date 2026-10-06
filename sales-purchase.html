@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sales &amp; Purchase · Tally Suite</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<div class="layout">
+  <aside id="sidebar"></aside>
+  <div class="main">
+    <header id="topbar"></header>
+    <main class="content">
+
+      <div class="page-head">
+        <h1>Sales &amp; Purchase Transactions</h1>
+        <div class="segmented" id="typeTabs">
+          <button class="active" data-type="Sales"><span data-icon="trendUp"></span>Sales <kbd class="mono" style="font-size:10px;opacity:.6">F8</kbd></button>
+          <button data-type="Purchase"><span data-icon="trendDown"></span>Purchase <kbd class="mono" style="font-size:10px;opacity:.6">F9</kbd></button>
+        </div>
+      </div>
+
+      <div class="stat-grid" id="statGrid"></div>
+
+      <form class="card" id="voucherForm" novalidate data-perm="create">
+        <div class="card-head">
+          <div class="card-title"><span class="ct-icon" data-icon="edit"></span><div id="formTitle">Sales Transaction<small>Creates entries in party, sales and GST ledgers</small></div></div>
+          <span class="badge badge-brand plain mono" id="vNumber"></span>
+        </div>
+        <div class="card-body">
+          <div class="field-grid cols-4">
+            <div class="field">
+              <label for="vDate">Date <span class="req">*</span></label>
+              <input type="date" id="vDate">
+            </div>
+            <div class="field">
+              <label for="vParty" id="vPartyLabel">Party A/c <span class="req">*</span></label>
+              <select id="vParty"></select>
+              <span class="err-msg" id="errVParty">Select a party ledger.</span>
+            </div>
+            <div class="field">
+              <label for="vAccount" id="vAccountLabel">Sales Ledger</label>
+              <select id="vAccount"></select>
+            </div>
+            <div class="field">
+              <label for="vState">Place of Supply</label>
+              <select id="vState"></select>
+            </div>
+            <div class="field">
+              <label for="vRef" id="vRefLabel">Reference No.</label>
+              <input type="text" id="vRef" placeholder="Optional">
+            </div>
+            <div class="field">
+              <label for="vGstin">Party GSTIN</label>
+              <input type="text" id="vGstin" maxlength="15" style="text-transform:uppercase" placeholder="Unregistered">
+            </div>
+            <div class="field span-2">
+              <label for="vNarration">Narration</label>
+              <input type="text" id="vNarration" placeholder="Being goods sold…">
+            </div>
+          </div>
+
+          <div class="table-wrap" style="margin:22px -20px 0;border-top:1px solid var(--border)">
+            <table class="table stack-sm">
+              <thead><tr><th>Item</th><th>HSN</th><th class="num">Qty</th><th class="num">Rate</th><th>GST</th><th class="num">Amount</th><th></th></tr></thead>
+              <tbody id="itemBody"></tbody>
+            </table>
+          </div>
+          <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start;margin-top:12px">
+            <div>
+              <button type="button" class="btn btn-ghost btn-sm" id="addItemBtn"><span data-icon="plus"></span>Add line</button>
+              <span class="err-msg" id="errItems">Add at least one item with quantity and rate.</span>
+            </div>
+            <div class="totals" id="totals"></div>
+          </div>
+        </div>
+        <div class="card-foot">
+          <button type="button" class="btn btn-ghost" id="resetBtn">Clear</button>
+          <button type="submit" class="btn btn-primary"><span data-icon="check"></span>Save Transaction</button>
+        </div>
+      </form>
+
+      <div class="card mt">
+        <div class="card-head">
+          <div class="card-title"><span class="ct-icon" data-icon="ledger"></span><div id="registerTitle">Sales Register<small></small></div></div>
+          <div class="toolbar">
+            <div class="search-box"><span data-icon="search"></span><input type="text" id="regSearch" placeholder="Search…"></div>
+            <select class="select-sm" id="regMonth"></select>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="table stack-sm">
+            <thead><tr><th>Transaction No.</th><th>Date</th><th>Party</th><th>Ref</th><th class="num">Taxable</th><th class="num">GST</th><th class="num">Total</th><th></th></tr></thead>
+            <tbody id="regBody"></tbody>
+            <tfoot id="regFoot"></tfoot>
+          </table>
+        </div>
+          <div id="regPager"></div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<div class="modal-overlay" id="viewModal">
+  <div class="modal lg">
+    <div class="modal-head"><h3 id="viewTitle">Transaction</h3><button class="icon-btn" data-close="viewModal" data-icon="x"></button></div>
+    <div class="modal-body" id="viewBody" style="background:var(--surface-2)"></div>
+    <div class="modal-foot">
+      <button class="btn btn-danger" id="deleteBtn" data-perm="delete"><span data-icon="trash"></span>Delete</button>
+      <span style="flex:1"></span>
+      <button class="btn btn-ghost" data-close="viewModal">Close</button>
+      <button class="btn btn-primary" id="printBtn"><span data-icon="printer"></span>Print</button>
+    </div>
+  </div>
+</div>
+
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+<script src="assets/js/tally.js"></script>
+<script src="assets/js/items.js"></script>
+<script>
+  var tenant = App.renderShell({ active: "salespurchase", title: "Sales & Purchase", subtitle: "Transactions · Item invoices" });
+  var $ = function (id) { return document.getElementById(id); };
+  var regPg = App.pager("regPager", renderRegister, { resetOn: ["#typeTabs"] });
+  var type = new URLSearchParams(location.search).get("type") === "Purchase" ? "Purchase" : "Sales";
+  var viewingId = null, printHtml = "";
+
+  $("vState").innerHTML = Data.INDIAN_STATES.map(function (s) { return "<option>" + s + "</option>"; }).join("");
+  var editor = Items.editor($("itemBody"), updateTotals);
+  $("addItemBtn").addEventListener("click", function () { editor.addRow({}).querySelector(".it-name").focus(); });
+
+  function updateTotals() {
+    $("totals").innerHTML = Items.totalsHtml(Data.computeTotals(editor.getItems(), $("vState").value));
+  }
+
+  function setType(t) {
+    type = t;
+    var sales = t === "Sales";
+    $("typeTabs").querySelectorAll("button").forEach(function (b) { b.classList.toggle("active", b.dataset.type === t); });
+    $("formTitle").innerHTML = t + " Transaction<small>Creates entries in party, " + t.toLowerCase() + " and GST ledgers</small>";
+    $("vPartyLabel").innerHTML = (sales ? "Customer" : "Supplier") + ' <span class="req">*</span>';
+    $("vAccountLabel").textContent = t + " Ledger";
+    $("vRefLabel").textContent = sales ? "Order / Ref No." : "Supplier Invoice No.";
+    $("vNarration").placeholder = sales ? "Being goods sold…" : "Being goods purchased…";
+    $("vParty").innerHTML = App.ledgerOptions(App.ledgersIn([sales ? "Sundry Debtors" : "Sundry Creditors"]), "", "Select " + (sales ? "customer" : "supplier"));
+    $("vAccount").innerHTML = App.ledgerOptions(App.ledgersIn([sales ? "Sales Accounts" : "Purchase Accounts"]), sales ? "Sales Account" : "Purchase Account");
+    resetForm();
+    renderStats(); renderRegister();
+  }
+
+  function resetForm() {
+    $("vDate").value = App.today();
+    $("vParty").value = ""; $("vRef").value = ""; $("vGstin").value = ""; $("vNarration").value = "";
+    $("vState").value = tenant.state;
+    $("vParty").classList.remove("error"); $("errVParty").classList.remove("show"); $("errItems").classList.remove("show");
+    editor.setItems([]);
+    $("vNumber").textContent = Data.nextNumber(type, $("vDate").value);
+  }
+
+  $("typeTabs").addEventListener("click", function (e) { var b = e.target.closest("button"); if (b) setType(b.dataset.type); });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "F8") { e.preventDefault(); setType("Sales"); }
+    if (e.key === "F9") { e.preventDefault(); setType("Purchase"); }
+  });
+  $("vParty").addEventListener("change", function () {
+    var l = App.findLedger(this.value);
+    if (l) { $("vGstin").value = l.gstin || ""; if (l.state) $("vState").value = l.state; }
+    updateTotals();
+  });
+  $("vState").addEventListener("change", updateTotals);
+  $("resetBtn").addEventListener("click", resetForm);
+
+  $("voucherForm").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var items = editor.getItems();
+    var okParty = !!$("vParty").value, okItems = items.length > 0 && items.every(function (i) { return i.rate > 0; });
+    $("vParty").classList.toggle("error", !okParty); $("errVParty").classList.toggle("show", !okParty);
+    $("errItems").classList.toggle("show", !okItems);
+    if (!okParty || !okItems) return App.toast("Please complete the highlighted fields.", "bad");
+
+    var v = Data.addVoucher({
+      type: type, date: $("vDate").value, party: $("vParty").value, account: $("vAccount").value,
+      partyState: $("vState").value, partyGstin: $("vGstin").value.trim().toUpperCase(),
+      ref: $("vRef").value.trim(), narration: $("vNarration").value.trim(), items: items
+    });
+    App.toast(type + " transaction " + v.number + " saved · " + App.inr(v.total));
+    resetForm(); renderStats(); renderRegister();
+  });
+
+  /* ---------------- Stats & register ---------------- */
+  function ofType() { return Data.list("vouchers").filter(function (v) { return v.type === type; }); }
+
+  function renderStats() {
+    var vs = ofType(), sales = type === "Sales";
+    var thisMonth = App.today().slice(0, 7);
+    var tax = vs.reduce(function (s, v) { return s + v.cgst + v.sgst + v.igst; }, 0);
+    var items = [
+      { label: "Total " + type, value: App.compactInr(vs.reduce(function (s, v) { return s + v.total; }, 0)), sub: vs.length + " transactions", icon: sales ? "trendUp" : "trendDown", tone: sales ? "brand" : "warn" },
+      { label: "This Month", value: App.compactInr(vs.filter(function (v) { return v.date.indexOf(thisMonth) === 0; }).reduce(function (s, v) { return s + v.total; }, 0)), sub: new Date().toLocaleDateString("en-IN", { month: "long", year: "numeric" }), icon: "calendar", tone: "info" },
+      { label: sales ? "Output GST" : "Input GST Credit", value: App.compactInr(tax), sub: "CGST + SGST + IGST", icon: "rupee", tone: "accent" },
+      { label: sales ? "Customers" : "Suppliers", value: App.ledgersIn([sales ? "Sundry Debtors" : "Sundry Creditors"]).length, sub: "Party ledgers", icon: "users", tone: "good" }
+    ];
+    $("statGrid").innerHTML = items.map(function (s) {
+      return '<div class="stat-card" style="--tint:var(--' + s.tone + ')"><div class="stat-top"><span class="stat-label">' + s.label + '</span><span class="stat-icon tone-' + s.tone + '">' + App.icon(s.icon) + '</span></div><div class="stat-value">' + s.value + '</div><div class="stat-sub">' + s.sub + "</div></div>";
+    }).join("");
+
+    var months = {};
+    vs.forEach(function (v) { months[v.date.slice(0, 7)] = true; });
+    var cur = $("regMonth").value;
+    $("regMonth").innerHTML = '<option value="">All months</option>' + Object.keys(months).sort().reverse().map(function (m) {
+      return '<option value="' + m + '"' + (m === cur ? " selected" : "") + ">" + new Date(m + "-01").toLocaleDateString("en-IN", { month: "short", year: "numeric" }) + "</option>";
+    }).join("");
+  }
+
+  function renderRegister() {
+    var q = $("regSearch").value.trim().toLowerCase(), m = $("regMonth").value;
+    var rows = ofType().filter(function (v) {
+      return (!m || v.date.indexOf(m) === 0) && (!q || (v.number + v.party + (v.ref || "")).toLowerCase().indexOf(q) !== -1);
+    }).sort(function (a, b) { return b.date.localeCompare(a.date) || b.number.localeCompare(a.number); });
+
+    $("registerTitle").innerHTML = type + " Register<small>" + rows.length + " transactions</small>";
+    var rowsPage = regPg.slice(rows);
+    $("regBody").innerHTML = rowsPage.length ? rowsPage.map(function (v) {
+      return '<tr><td class="mono cell-strong">' + v.number + (v.source !== "manual" ? ' <span class="badge badge-info plain" style="font-size:10px">' + v.source + "</span>" : "") + "</td><td>" + App.date(v.date) + "</td>" +
+        "<td><span class='cell-strong'>" + App.esc(v.party) + "</span><span class='cell-sub'>" + App.esc(v.partyState || "") + "</span></td><td class='muted'>" + App.esc(v.ref || "—") + "</td>" +
+        '<td class="num">' + App.inr(v.subtotal) + '</td><td class="num">' + App.inr(v.cgst + v.sgst + v.igst) + '</td><td class="num cell-strong">' + App.inr(v.total) + "</td>" +
+        '<td><div class="row-actions"><button class="btn btn-ghost btn-xs" data-view="' + v.id + '">' + App.icon("eye") + "View</button></div></td></tr>";
+    }).join("") : App.emptyRow(8, "No " + type.toLowerCase() + " transactions", "Save a transaction above to see it here.");
+    var tot = rows.reduce(function (s, v) { s.a += v.subtotal; s.b += v.cgst + v.sgst + v.igst; s.c += v.total; return s; }, { a: 0, b: 0, c: 0 });
+    $("regFoot").innerHTML = rows.length ? '<tr><td colspan="4">Total · ' + rows.length + ' entries</td><td class="num">' + App.inr(tot.a) + '</td><td class="num">' + App.inr(tot.b) + '</td><td class="num">' + App.inr(tot.c) + "</td><td></td></tr>" : "";
+  }
+  $("regSearch").addEventListener("input", renderRegister);
+  $("regMonth").addEventListener("change", renderRegister);
+
+  $("regBody").addEventListener("click", function (e) {
+    var b = e.target.closest("[data-view]");
+    if (!b) return;
+    var v = Data.get("vouchers", b.dataset.view);
+    viewingId = v.id;
+    $("viewTitle").textContent = v.type + " transaction · " + v.number;
+    printHtml = Items.preview(v, tenant, v.type === "Sales" ? "TAX INVOICE" : "PURCHASE BILL");
+    var posting = Data.postings(v).map(function (p) {
+      return "<tr><td>" + (p.dr ? "Dr" : "Cr") + "</td><td class='cell-strong'>" + App.esc(p.ledger) + '</td><td class="num">' + (p.dr ? App.inr(p.dr) : "") + '</td><td class="num">' + (p.cr ? App.inr(p.cr) : "") + "</td></tr>";
+    }).join("");
+    $("viewBody").innerHTML = printHtml + '<div class="card mt"><div class="card-head"><div class="card-title"><span class="ct-icon">' + App.icon("ledger") + '</span><div>Ledger postings<small>Double-entry generated for this transaction</small></div></div></div>' +
+      '<div class="table-wrap"><table class="table"><thead><tr><th></th><th>Ledger</th><th class="num">Debit</th><th class="num">Credit</th></tr></thead><tbody>' + posting + "</tbody></table></div></div>";
+    $("deleteBtn").style.display = v.einvoice && v.einvoice.status === "Generated" ? "none" : "";
+    App.openModal("viewModal");
+  });
+  $("printBtn").addEventListener("click", function () { Items.print(printHtml); });
+  $("deleteBtn").addEventListener("click", function () {
+    var bill = Data.list("ewaybills").filter(function (b) { return b.voucherId === viewingId && b.status !== "Cancelled"; })[0];
+    if (bill) return App.toast("Cancel e-Way Bill " + bill.ewbNo + " before deleting this invoice.", "bad");
+    App.confirm({ title: "Delete transaction?", message: "Ledger balances will be updated.", ok: "Delete", danger: true }).then(function (ok) {
+      if (!ok) return;
+      Data.remove("vouchers", viewingId);
+      App.closeModal("viewModal");
+      App.toast("Transaction deleted.");
+      renderStats(); renderRegister();
+    });
+  });
+
+  setType(type);
+</script>
+</body>
+</html>

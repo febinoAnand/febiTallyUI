@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard · FebiTally</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<div class="layout">
+  <aside id="sidebar"></aside>
+  <div class="main">
+    <header id="topbar"></header>
+    <main class="content">
+
+      <header class="page-head">
+        <h1>Dashboard</h1>
+        <div class="page-actions">
+          <a class="btn btn-outline" href="ledgers.html" id="fetchLink">Fetch ledgers</a>
+          <a class="btn btn-primary" href="import.html" id="importLink">Import statement</a>
+        </div>
+      </header>
+
+      <div class="stat-grid cols-5">
+        <div class="stat-card" style="--tint:var(--brand)">
+          <div class="stat-top"><span class="stat-label">Tally Prime</span></div>
+          <div class="stat-value" id="st-tally">…</div>
+          <div class="stat-sub" id="st-tally-hint">Checking connection</div>
+        </div>
+        <div class="stat-card" style="--tint:var(--info)">
+          <div class="stat-top"><span class="stat-label">Imports</span></div>
+          <div class="stat-value" id="st-imports">–</div>
+          <div class="stat-sub">bank statements uploaded</div>
+        </div>
+        <div class="stat-card" style="--tint:var(--warn)">
+          <div class="stat-top"><span class="stat-label">Pending review</span></div>
+          <div class="stat-value" id="st-pending">–</div>
+          <div class="stat-sub">entries not validated yet</div>
+        </div>
+        <div class="stat-card" style="--tint:var(--accent)">
+          <div class="stat-top"><span class="stat-label">Ready to push</span></div>
+          <div class="stat-value" id="st-validated">–</div>
+          <div class="stat-sub">validated entries</div>
+        </div>
+        <div class="stat-card" style="--tint:var(--good)">
+          <div class="stat-top"><span class="stat-label">Pushed to Tally</span></div>
+          <div class="stat-value" id="st-pushed">–</div>
+          <div class="stat-sub" id="st-failed-hint"></div>
+        </div>
+      </div>
+
+      <div class="grid two-col dash-grid">
+        <div class="card" id="recentCard">
+          <div class="card-head"><div class="card-title"><h2 class="h2">Recent imports</h2></div><a href="import.html">View all</a></div>
+          <div class="table-wrap">
+            <table class="table stack-sm">
+              <thead><tr><th>#</th><th>File</th><th>Company / Bank</th><th>Date</th><th class="num">Entries</th><th class="num">Withdrawals</th><th class="num">Deposits</th><th>Status</th></tr></thead>
+              <tbody id="recent"><tr><td colspan="8"><div class="empty-state">Loading…</div></td></tr></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card" id="ledgerCard">
+          <div class="card-head"><div class="card-title"><h2 class="h2">Ledgers cached</h2></div><a href="ledgers.html">Manage</a></div>
+          <div class="table-wrap">
+            <table class="table stack-sm">
+              <thead><tr><th>Company</th><th class="num">Ledgers</th><th>Fetched</th></tr></thead>
+              <tbody id="ledger-counts"><tr><td colspan="3"><div class="empty-state">Loading…</div></td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+<script src="assets/js/tally.js"></script>
+<script>
+  App.renderShell({ active: "dashboard", title: "Dashboard" });
+  var $ = function (id) { return document.getElementById(id); };
+  var canImports = App.can("statement", "view"), canLedgers = App.can("ledger", "view");
+
+  if (!canLedgers) { $("fetchLink").remove(); $("ledgerCard").remove(); }
+  if (!canImports) { $("importLink").remove(); $("recentCard").remove(); }
+
+  /* ---- Tally status card ---- */
+  document.addEventListener("tally:status", function (e) {
+    var st = e.detail;
+    $("st-tally").innerHTML = st.ok ? '<span class="badge badge-good">Connected</span>' : '<span class="badge badge-bad">Offline</span>';
+    $("st-tally-hint").textContent = st.ok ? st.version + " · " + st.host + ":" + st.port : "Not reachable at " + st.host + ":" + st.port;
+  });
+
+  /* ---- Import counters ---- */
+  var imports = Data.list("stmtImports").slice().sort(function (a, b) { return b.uploadedAt.localeCompare(a.uploadedAt); });
+  var totals = { pending: 0, validated: 0, pushed: 0, failed: 0 };
+  imports.forEach(function (imp) {
+    var s = Tally.importStats(imp);
+    totals.pending += s.pending; totals.validated += s.validated; totals.pushed += s.pushed; totals.failed += s.failed;
+  });
+  $("st-imports").textContent = imports.length;
+  $("st-pending").textContent = totals.pending;
+  $("st-validated").textContent = totals.validated;
+  $("st-pushed").textContent = totals.pushed;
+  $("st-failed-hint").textContent = totals.failed ? totals.failed + " failed — review on the Import page" : "no failed pushes";
+
+  /* ---- Recent imports ---- */
+  if (canImports) {
+    var all = Data.list("stmtImports").slice().sort(function (a, b) { return a.uploadedAt.localeCompare(b.uploadedAt); });
+    $("recent").innerHTML = imports.length ? imports.slice(0, 6).map(function (imp) {
+      var s = Tally.importStats(imp), n = all.indexOf(all.filter(function (x) { return x.id === imp.id; })[0]) + 1;
+      return '<tr class="clickable" data-open="' + imp.id + '"><td class="mono">' + n + '</td><td class="cell-strong">' + App.esc(imp.file) + "</td>" +
+        "<td>" + App.esc(imp.company) + '<span class="cell-sub">' + App.esc(imp.bank) + "</span></td><td style=\"white-space:nowrap\">" + App.date(imp.uploadedAt) + "</td>" +
+        '<td class="num">' + s.total + '</td><td class="num">' + App.inr(s.withdrawals) + '</td><td class="num">' + App.inr(s.deposits) + "</td>" +
+        '<td><span class="badge badge-' + s.tone + '">' + s.label + "</span></td></tr>";
+    }).join("") : '<tr><td colspan="8"><div class="empty-state"><strong>No imports yet</strong>Upload a bank statement to get started.</div></td></tr>';
+    $("recent").addEventListener("click", function (e) {
+      var tr = e.target.closest("[data-open]");
+      if (tr) location.href = "import.html?open=" + encodeURIComponent(tr.dataset.open);
+    });
+  }
+
+  /* ---- Ledger cache per company ---- */
+  if (canLedgers) {
+    $("ledger-counts").innerHTML = Tally.companies().map(function (c) {
+      var cache = Tally.cached(c);
+      return '<tr><td class="cell-strong">' + App.esc(c) + '</td><td class="num">' + (cache ? cache.ledgers.length : "—") + "</td><td>" +
+        (cache ? App.ago(cache.fetchedAt) : '<span class="badge badge-warn plain">Not fetched</span>') + "</td></tr>";
+    }).join("");
+  }
+</script>
+</body>
+</html>
