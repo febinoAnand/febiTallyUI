@@ -301,5 +301,8 @@ var Reader = (function () {
     return map;
   }
 
-  return { read: read, facts: facts, detectHeader: detectHeader, guessMapping: guessMapping, kind: kind };
+  /* SheetJS on demand, for pages that read or write workbooks (e-Invoice bulk tool, GSTR-1 export). */
+  function xlsx() { return loadScript(LIBS.xlsx).then(function () { return window.XLSX; }); }
+
+  return { read: read, facts: facts, detectHeader: detectHeader, guessMapping: guessMapping, kind: kind, xlsx: xlsx, readAs: readAs };
 })();

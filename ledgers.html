@@ -18,6 +18,10 @@
 
       <header class="page-head">
         <h1>Ledgers</h1>
+        <div class="segmented" id="viewTabs" role="tablist">
+          <button class="active" data-v="ledgers" role="tab">Ledgers</button>
+          <button data-v="groups" role="tab">Groups</button>
+        </div>
         <div class="page-actions">
           <span class="format-chip" id="formatChip"></span>
           <button class="btn btn-outline btn-sm" id="last-response-btn" disabled title="No Tally request yet">Last Tally response</button>
@@ -39,7 +43,7 @@
         </div>
       </div>
 
-      <div class="card mt">
+      <div class="card mt" id="ledgersView">
         <div class="card-head">
           <div class="card-title"><h2 class="h2">Ledgers <span class="muted" id="count"></span></h2></div>
           <div class="toolbar">
@@ -61,6 +65,24 @@
           </table>
         </div>
         <div id="ledgerPager"></div>
+      </div>
+
+      <div class="card mt hidden" id="groupsView">
+        <div class="card-head">
+          <div class="card-title"><h2 class="h2">Groups <span class="muted" id="groupCount"></span></h2></div>
+          <div class="toolbar">
+            <select id="nature-filter" class="select-sm" style="width:170px" aria-label="Nature"><option value="">All natures</option><option>Assets</option><option>Liabilities</option><option>Income</option><option>Expenses</option></select>
+            <div class="search-box"><span data-icon="search"></span><input type="text" id="group-search" placeholder="Search groups…"></div>
+            <button class="btn btn-primary btn-sm" id="add-group-btn" data-perm="create"><span data-icon="plus"></span>New group</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="table stack-sm group-table">
+            <thead><tr><th>Group</th><th>Under</th><th>Nature</th><th class="num">Sub-groups</th><th class="num">Ledgers</th><th class="num">Closing balance</th><th style="width:120px"></th></tr></thead>
+            <tbody id="group-rows"></tbody>
+          </table>
+        </div>
+        <div class="card-foot muted small" style="justify-content:flex-start">Groups are shared by all companies in your account. Predefined Tally groups are locked; create your own groups under them. Closing balance is for <b id="groupCompany" style="margin:0 3px"></b> and includes sub-groups.</div>
       </div>
 
     </main>
@@ -92,6 +114,35 @@
     <div class="modal-foot">
       <button type="button" class="btn btn-ghost" data-close="ledger-modal">Cancel</button>
       <button type="submit" class="btn btn-primary" id="save-ledger">Save to Tally</button>
+    </div>
+  </form>
+</div>
+
+<!-- New / edit group -->
+<div class="modal-overlay" id="group-modal">
+  <form class="modal" id="group-form" novalidate>
+    <div class="modal-head"><h3 id="group-modal-title">New group</h3><button type="button" class="icon-btn" data-close="group-modal" data-icon="x" aria-label="Close"></button></div>
+    <div class="modal-body">
+      <div class="field" style="margin-bottom:14px">
+        <label for="g-name">Name <span class="req">*</span></label>
+        <input type="text" id="g-name" maxlength="100" required autocomplete="off" placeholder="e.g. Marketplace Receivables">
+      </div>
+      <div class="field" style="margin-bottom:14px">
+        <label for="g-parent">Under</label>
+        <select id="g-parent"></select>
+        <div class="help">Choose Primary for a top-level group, or the group it belongs to.</div>
+      </div>
+      <div class="field" style="margin-bottom:14px">
+        <label for="g-nature">Nature</label>
+        <select id="g-nature"><option value="">Select nature</option><option>Assets</option><option>Liabilities</option><option>Income</option><option>Expenses</option></select>
+        <div class="help" id="g-nature-help"></div>
+      </div>
+      <div class="alert alert-error small hidden" id="group-error" style="margin-bottom:12px"></div>
+      <div class="alert alert-info small" style="margin:0">This change is written to Tally Prime immediately.</div>
+    </div>
+    <div class="modal-foot">
+      <button type="button" class="btn btn-ghost" data-close="group-modal">Cancel</button>
+      <button type="submit" class="btn btn-primary" id="save-group">Save to Tally</button>
     </div>
   </form>
 </div>
@@ -166,7 +217,7 @@
     $("add-btn").disabled = !cache;
     renderRows();
   }
-  $("company").addEventListener("change", function () { $("group-filter").value = ""; syncCompanyState(); });
+  $("company").addEventListener("change", function () { $("group-filter").value = ""; syncCompanyState(); renderGroups(); });
 
   $("fetch-btn").addEventListener("click", function () {
     var btn = this;
@@ -242,7 +293,8 @@
   });
 
   /* ---------------- New / edit modal ---------------- */
-  $("group-list").innerHTML = Tally.groupsOf(company()).map(function (g) { return '<option value="' + App.esc(g) + '">'; }).join("");
+  function refreshGroupList() { $("group-list").innerHTML = Tally.groupsOf(company()).map(function (g) { return '<option value="' + App.esc(g) + '">'; }).join(""); }
+  refreshGroupList();
   function readOpening() {
     var v = Number($("f-opening").value) || 0;
     $("f-opening-read").textContent = v ? "→ " + App.inr(Math.abs(v)) + (v < 0 ? " Debit" : " Credit") : "";
@@ -280,6 +332,131 @@
       syncHeader(); syncCompanyState();
     });
   });
+
+
+  /* ---------------- Groups ---------------- */
+  var NATURE_ORDER = { Assets: 0, Liabilities: 1, Income: 2, Expenses: 3 };
+  var NATURE_TONE = { Assets: "badge-brand", Liabilities: "badge-warn", Income: "badge-good", Expenses: "badge-bad" };
+  var editingGroup = null;
+
+  // Groups in tree order (primary groups by nature, children nested), each with its depth.
+  function groupTree() {
+    var gs = Tally.groups(), kids = {};
+    gs.forEach(function (g) { var p = g.parent || ""; (kids[p] = kids[p] || []).push(g); });
+    var byName = function (a, b) { return a.name.localeCompare(b.name); };
+    var out = [];
+    (function walk(parent, depth) {
+      (kids[parent] || []).sort(parent ? byName : function (a, b) { return (NATURE_ORDER[a.nature] - NATURE_ORDER[b.nature]) || byName(a, b); })
+        .forEach(function (g) { out.push({ g: g, depth: depth }); walk(g.name, depth + 1); });
+    })("", 0);
+    return out;
+  }
+  function branchBalance(name) {
+    var cache = Tally.cached(company());
+    if (!cache) return null;
+    var under = App.groupsUnder(name);
+    return cache.ledgers.filter(function (l) { return under.indexOf(l.parent) !== -1; }).reduce(function (s, l) { return s + (Number(l.closing_balance) || 0); }, 0);
+  }
+  function renderGroups() {
+    var q = $("group-search").value.trim().toLowerCase(), nat = $("nature-filter").value;
+    var all = groupTree(), gs = Tally.groups();
+    var rows = all.filter(function (x) { return (!nat || x.g.nature === nat) && (!q || (x.g.name + " " + (x.g.parent || "Primary")).toLowerCase().indexOf(q) !== -1); });
+    $("groupCount").textContent = "(" + rows.length + (rows.length !== all.length ? " of " + all.length : "") + ")";
+    $("groupCompany").textContent = company();
+    var flat = !!q;
+    $("group-rows").innerHTML = rows.length ? rows.map(function (x) {
+      var g = x.g, subs = gs.filter(function (c) { return c.parent === g.name; }).length, n = Tally.ledgersInGroup(g.name), bal = branchBalance(g.name);
+      var lock = g.predefined ? "Predefined Tally group — can't be changed" : "";
+      return '<tr><td><span class="grp-name" style="--depth:' + (flat ? 0 : x.depth) + '">' + (x.depth && !flat ? '<span class="grp-branch" aria-hidden="true"></span>' : "") + '<span class="cell-strong">' + App.esc(g.name) + "</span>" +
+        (g.predefined ? ' <span class="badge badge-muted plain" style="font-size:10px">Predefined</span>' : ' <span class="badge badge-info plain" style="font-size:10px">Custom</span>') + "</span></td>" +
+        "<td>" + App.esc(g.parent || "Primary") + "</td><td><span class=\"badge " + (NATURE_TONE[g.nature] || "badge-muted") + ' plain">' + App.esc(g.nature || "—") + "</span></td>" +
+        '<td class="num">' + subs + '</td><td class="num">' + (n ? '<button class="btn btn-ghost btn-xs" data-show="' + App.esc(g.name) + '" title="Show these ledgers">' + n + "</button>" : "0") + "</td>" +
+        '<td class="num">' + (bal == null ? "—" : balText(bal)) + "</td>" +
+        '<td><div class="row-actions">' +
+          (g.predefined ? '<span class="grp-lock" title="' + lock + '">' + App.icon("lock") + "</span>" :
+            '<button class="btn btn-ghost btn-xs" data-perm="edit" data-gedit="' + App.esc(g.name) + '" title="Edit">' + App.icon("edit") + "</button>" +
+            '<button class="btn btn-danger btn-xs" data-perm="delete" data-gdel="' + App.esc(g.name) + '" title="Delete">' + App.icon("trash") + "</button>") +
+        "</div></td></tr>";
+    }).join("") : App.emptyRow(7, "No groups match", "Try another search or nature.");
+  }
+  $("group-search").addEventListener("input", renderGroups);
+  $("nature-filter").addEventListener("change", renderGroups);
+
+  function setView(v) {
+    $("viewTabs").querySelectorAll("button").forEach(function (b) { b.classList.toggle("active", b.dataset.v === v); });
+    $("ledgersView").classList.toggle("hidden", v !== "ledgers");
+    $("groupsView").classList.toggle("hidden", v !== "groups");
+    try { history.replaceState(null, "", v === "groups" ? "#groups" : location.pathname + location.search); } catch (e) { /* ignore */ }
+    if (v === "groups") renderGroups();
+  }
+  $("viewTabs").addEventListener("click", function (e) { var b = e.target.closest("button"); if (b) setView(b.dataset.v); });
+
+  $("group-rows").addEventListener("click", function (e) {
+    var b = e.target.closest("button");
+    if (!b) return;
+    if (b.dataset.show) {
+      var name = b.dataset.show, sel = $("group-filter");
+      if (![].some.call(sel.options, function (o) { return o.value === name; })) return App.toast("No ledgers under “" + name + "” in " + company() + " — fetch from Tally if you've just added some.", "info");
+      sel.value = name; setView("ledgers"); renderRows();
+    }
+    if (b.dataset.gedit) openGroup(b.dataset.gedit);
+    if (b.dataset.gdel) {
+      var gname = b.dataset.gdel;
+      App.confirm({ title: "Delete group?", message: "Delete “" + gname + "” from Tally Prime?", detail: "Only empty groups (no ledgers or sub-groups) can be deleted.", ok: "Delete", danger: true }).then(function (ok) {
+        if (!ok) return;
+        Tally.deleteGroup(gname).then(function () { App.toast("Group “" + gname + "” deleted from Tally."); })
+          .catch(function (err) { App.toast(err.message, "bad"); })
+          .then(function () { syncHeader(); refreshGroupList(); renderGroups(); });
+      });
+    }
+  });
+
+  function fillParents(selected, exclude) {
+    var skip = exclude ? App.groupsUnder(exclude) : [];
+    $("g-parent").innerHTML = '<option value="Primary">Primary (top level)</option>' + groupTree().filter(function (x) { return skip.indexOf(x.g.name) === -1; }).map(function (x) {
+      return '<option value="' + App.esc(x.g.name) + '"' + (x.g.name === selected ? " selected" : "") + ">" + "\u00a0\u00a0".repeat(x.depth) + App.esc(x.g.name) + "</option>";
+    }).join("");
+    if (!selected) $("g-parent").value = "Primary";
+  }
+  function syncNature() {
+    var p = $("g-parent").value, primary = p === "Primary";
+    $("g-nature").disabled = !primary;
+    if (!primary) $("g-nature").value = Tally.natureOf(p);
+    $("g-nature-help").textContent = primary ? "A top-level group needs a nature — it decides where the group appears in the Balance Sheet or P&L." : "Comes from “" + p + "”.";
+  }
+  $("g-parent").addEventListener("change", syncNature);
+
+  function openGroup(name) {
+    var g = name ? Tally.groupByName(name) : null;
+    editingGroup = g ? g.name : null;
+    $("group-modal-title").textContent = g ? "Edit group" : "New group";
+    $("g-name").value = g ? g.name : "";
+    fillParents(g ? g.parent : "", g ? g.name : null);
+    $("g-nature").value = g ? g.nature || "" : "";
+    syncNature();
+    $("group-error").classList.add("hidden");
+    App.openModal("group-modal");
+    setTimeout(function () { $("g-name").focus(); }, 50);
+  }
+  $("add-group-btn").addEventListener("click", function () { openGroup(null); });
+
+  $("group-form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var input = { name: $("g-name").value, parent: $("g-parent").value, nature: $("g-nature").value };
+    var btn = $("save-group"), wasEditing = editingGroup;
+    btn.disabled = true; btn.textContent = "Saving…";
+    (wasEditing ? Tally.alterGroup(wasEditing, input) : Tally.createGroup(input)).then(function () {
+      App.closeModal("group-modal");
+      App.toast(wasEditing ? "Group updated in Tally." : "Group “" + input.name.trim() + "” created in Tally.");
+    }).catch(function (err) {
+      $("group-error").textContent = err.message;
+      $("group-error").classList.remove("hidden");
+    }).then(function () {
+      btn.disabled = false; btn.textContent = "Save to Tally";
+      syncHeader(); refreshGroupList(); syncCompanyState(); renderGroups();
+    });
+  });
+  if (location.hash === "#groups") setView("groups");
 
   /* ---------------- Ledger statement ---------------- */
   var stmtRows = [];
