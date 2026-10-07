@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/style.css">
+<script src="assets/js/view.js"></script>
 <style>
   .transfer { display: grid; grid-template-columns: 1fr auto 1fr; gap: 14px; align-items: center; margin: 4px 0 20px; }
   .transfer-box { border: 1px solid var(--border-strong); border-radius: 8px; padding: 14px 16px; background: var(--surface-2); }
@@ -100,7 +101,7 @@
                 </select>
               </div>
             </div>
-            <div class="table-wrap" style="margin:0 -20px;border-top:1px solid var(--border)">
+            <div class="table-wrap bleed" style="border-top:1px solid var(--border)">
               <table class="table stack-sm">
                 <thead><tr><th style="width:88px">Dr/Cr</th><th>Ledger</th><th class="num" style="width:150px">Debit</th><th class="num" style="width:150px">Credit</th><th style="width:44px"></th></tr></thead>
                 <tbody id="jLines"></tbody>

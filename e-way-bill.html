@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/style.css">
+<script src="assets/js/view.js"></script>
 </head>
 <body>
 <div class="layout">
@@ -244,9 +245,9 @@
       var st = statusOf(b), fresh = Date.now() - new Date(b.generatedAt).getTime() < 24 * 3600 * 1000;
       return '<tr><td class="mono cell-strong">' + b.ewbNo.replace(/(\d{4})(?=\d)/g, "$1 ") + "<span class='cell-sub'>" + App.dateTime(b.generatedAt) + "</span></td>" +
         '<td class="mono" style="font-size:12px">' + b.invoiceNumber + "<span class='cell-sub' style='font-family:var(--font)'>" + App.esc(b.party) + "</span></td>" +
-        "<td>" + App.esc(b.toPlace) + " <span class='muted mono'>" + b.toPin + "</span></td>" +
+        "<td><span>" + App.esc(b.toPlace) + " <span class='muted mono'>" + b.toPin + "</span></span></td>" +
         '<td class="mono" style="font-size:12px">' + b.vehicleNo + "<span class='cell-sub' style='font-family:var(--font)'>" + b.mode + "</span></td>" +
-        '<td class="num">' + b.distance + " km</td><td>" + App.dateTime(b.validUntil) + '</td><td><span class="badge ' + BADGE[st] + '">' + st + "</span></td>" +
+        '<td class="num" style="white-space:nowrap">' + b.distance + " km</td><td>" + App.dateTime(b.validUntil) + '</td><td><span class="badge ' + BADGE[st] + '">' + st + "</span></td>" +
         '<td><div class="row-actions">' +
         (st === "Active" ? '<button class="btn btn-ghost btn-xs" data-perm="edit" data-veh="' + b.id + '" title="Update vehicle">' + App.icon("edit") + "</button>" : "") +
         (st !== "Cancelled" ? '<button class="btn btn-ghost btn-xs" data-perm="edit" data-ext="' + b.id + '" title="Extend validity">' + App.icon("refresh") + "Extend</button>" : "") +
@@ -294,15 +295,6 @@
     App.toast("Vehicle updated to " + v + ".");
     renderList();
   });
-
-  // Give the demo tenant one e-Way Bill against its latest large invoice so the list isn't empty.
-  (function seedOnce() {
-    if (Data.list("ewaybills").length || tenant.tenantId !== Data.DEMO_TENANT) return;
-    var big = invoices().sort(function (a, b) { return b.total - a.total; })[0];
-    if (!big) return;
-    var g = new Date(); g.setHours(g.getHours() - 5);
-    Data.add("ewaybills", { ewbNo: "331009876543", voucherId: big.id, invoiceNumber: big.number, party: big.party, value: big.total, fromPin: "600040", toPlace: big.partyState, toPin: "560001", subType: "Supply", mode: "Road", distance: 350, vehicleNo: "TN09BX4521", vehicleType: "Regular", transporter: "VRL Logistics", transporterId: "", generatedAt: g.toISOString(), validUntil: validUntil(2), status: "Active" });
-  })();
 
   fillInvoices(); preview(); renderStats(); renderList();
 </script>

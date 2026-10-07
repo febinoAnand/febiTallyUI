@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mobile view · Tally Suite</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+<script src="assets/js/view.js"></script>
+</head>
+<body class="phone-stage">
+
+<div class="phone">
+  <div class="phone-screen">
+    <div class="phone-status" aria-hidden="true"><span class="phone-island"></span></div>
+    <iframe id="screen" title="App in mobile view"></iframe>
+  </div>
+</div>
+
+<script>
+  (function () {
+    var p = FebiView.safeNext(new URLSearchParams(location.search).get("p")) || "login.html";
+    if (FebiView.mode !== "mobile") { location.replace(FebiView.mode ? p : "index.html?next=" + encodeURIComponent(p)); return; }
+    // A real phone needs no frame.
+    if (!FebiView.wide()) { location.replace(p); return; }
+
+    var screenEl = document.getElementById("screen");
+    screenEl.src = p;
+
+    window.addEventListener("message", function (e) {
+      var m = e.data || {};
+      if (e.source !== screenEl.contentWindow || !m.febi) return;
+      if (m.febi === "page" && FebiView.safeNext(m.url)) {
+        history.replaceState(null, "", "mobile.html?p=" + encodeURIComponent(m.url));
+        document.title = (m.title || "Tally Suite") + " · Mobile view";
+      }
+      if (m.febi === "nav" && /^[\w-]+\.html([?#].*)?$/.test(m.url || "")) location.href = m.url;
+    });
+  })();
+</script>
+</body>
+</html>

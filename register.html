@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/style.css">
+<script src="assets/js/view.js"></script>
 <style>
   .entry.reg { grid-template-columns: minmax(0, 0.7fr) minmax(0, 1.3fr); }
   .reg-steps { list-style: none; margin: 0; padding: 0; counter-reset: s; max-width: 380px; }
@@ -39,6 +40,8 @@
 
   <main class="entry-main">
     <div class="entry-form wide">
+      <div class="entry-mbrand"><span class="mark">T</span><div><strong>Tally Suite</strong><span>Cloud accounting</span></div></div>
+      <button type="button" class="view-pill" data-view-pill></button>
       <div class="entry-kicker">Step 1 of 3 · Register</div>
       <h1 class="entry-title">Register your company</h1>
       <p class="entry-sub">It takes about a minute. Fields marked <span class="req">*</span> are required.</p>
@@ -130,7 +133,7 @@
         <button type="submit" class="btn btn-primary entry-submit" style="margin-top:22px">Continue to email verification</button>
       </form>
 
-      <div class="entry-switch">Already have a Company ID? <a href="index.html">Sign in →</a></div>
+      <div class="entry-switch">Already have a Company ID? <a href="login.html">Sign in →</a></div>
     </div>
   </main>
 </div>

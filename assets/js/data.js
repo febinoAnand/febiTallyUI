@@ -412,6 +412,15 @@ var Data = (function () {
       save("vouchers", vs);
     }
 
+    // One e-Way Bill against the largest seeded invoice so the e-Way Bill list isn't empty.
+    // Seeded here (not on first visit to the page) so it never lands on an invoice the user created.
+    var big = list("vouchers").filter(function (v) { return v.type === "Sales"; }).sort(function (a, b) { return b.total - a.total; })[0];
+    if (big) {
+      var gen = new Date(); gen.setHours(gen.getHours() - 5);
+      var until = new Date(); until.setDate(until.getDate() + 2); until.setHours(23, 59, 0, 0);
+      add("ewaybills", { ewbNo: "331009876543", voucherId: big.id, invoiceNumber: big.number, party: big.party, value: big.total, fromPin: "600040", toPlace: big.partyState, toPin: "560001", subType: "Supply", mode: "Road", distance: 350, vehicleNo: "TN09BX4521", vehicleType: "Regular", transporter: "VRL Logistics", transporterId: "", generatedAt: gen.toISOString(), validUntil: until.toISOString(), status: "Active" });
+    }
+
     add("quotations", { number: "QTN/26-27/0001", date: "2026-10-01", validTill: "2026-10-15", party: "Metro Distributors", partyState: "Karnataka", partyGstin: "29AABCM9911Q1ZK", items: [Object.assign({ qty: 20 }, ITEMS[0]), Object.assign({ qty: 10 }, ITEMS[4])], status: "Open", notes: "Prices valid for 15 days. Freight extra." });
     var q = list("quotations")[0];
     Object.assign(q, computeTotals(q.items, q.partyState));

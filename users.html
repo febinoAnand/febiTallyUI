@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/style.css">
+<script src="assets/js/view.js"></script>
 </head>
 <body>
 <div class="layout">
@@ -209,7 +210,7 @@
       var actions =
         '<button class="btn btn-ghost btn-xs" data-perm="edit" data-edit="' + u.id + '" title="Edit">' + App.icon("edit") + "</button>" +
         (u.owner ? "" : '<button class="btn btn-ghost btn-xs" data-perm="edit" data-pw="' + u.id + '" title="Reset password">' + App.icon("key") + "</button>") +
-        (locked ? "" : '<button class="btn btn-ghost btn-xs" data-perm="edit" data-toggle-status="' + u.id + '">' + (u.status === "Active" ? "Deactivate" : "Activate") + "</button>") +
+        (locked ? "" : '<button class="btn btn-ghost btn-xs status-toggle" data-perm="edit" data-toggle-status="' + u.id + '">' + (u.status === "Active" ? "Deactivate" : "Activate") + "</button>") +
         (locked ? "" : '<button class="btn btn-danger btn-xs" data-perm="delete" data-del="' + u.id + '" title="Delete">' + App.icon("trash") + "</button>");
       return "<tr>" +
         '<td><div class="user-cell"><span class="user-avatar tone-' + toneFor(u.username) + '">' + App.esc(App.initials(u.name)) + "</span><div><strong>" + App.esc(u.name) + (self ? '<span class="you-tag">You</span>' : "") + "</strong><span>" + App.esc(u.email || "") + "</span></div></div></td>" +

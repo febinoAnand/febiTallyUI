@@ -53,7 +53,10 @@ var App = (function () {
     settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
     importIcon: '<path d="M12 3v12"/><polyline points="7 10 12 15 17 10"/><path d="M5 20h14"/>',
     list: '<line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/>',
-    zap: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>'
+    zap: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
+    monitor: '<rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/>',
+    phone: '<rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M11 18h2"/>',
+    more: '<circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/>'
   };
 
   function icon(name, extra) {
@@ -127,7 +130,7 @@ var App = (function () {
   }
   function logout() {
     sessionStorage.removeItem(SESSION_KEY);
-    window.location.href = "index.html";
+    window.location.href = "login.html";
   }
   function isLoggedIn() { return !!getSession(); }
 
@@ -148,7 +151,7 @@ var App = (function () {
     }
     if (!tenant || tenant.status !== "Active" || !currentUserRec || currentUserRec.status !== "Active") {
       sessionStorage.removeItem(SESSION_KEY);
-      window.location.replace("index.html");
+      window.location.replace("login.html");
       throw new Error(REDIRECT);
     }
     return tenant;
@@ -182,6 +185,7 @@ var App = (function () {
       return '<a class="nav-item' + (n.key === opts.active ? " active" : "") + '" href="' + n.href + '">' + icon(n.icon) + "<span>" + n.label + "</span>" + "</a>";
     }).join("");
 
+    var mobileView = document.documentElement.getAttribute("data-view") === "mobile";
     var sidebar = document.getElementById("sidebar");
     sidebar.className = "sidebar";
     sidebar.innerHTML =
@@ -189,6 +193,7 @@ var App = (function () {
       '<div class="tenant-chip">' + icon("building") + "<div><strong>" + esc(tenant.companyName) + "</strong><span>" + tenant.tenantId + "</span></div></div>" +
       '<nav class="nav">' + nav + "</nav>" +
       '<div class="sidebar-foot">' +
+        (window.FebiView ? '<button type="button" class="view-switch" id="viewSwitch">' + icon(mobileView ? "monitor" : "phone") + "Switch to " + (mobileView ? "web" : "mobile") + " view</button>" : "") +
         '<a class="tally-status" href="' + (can("settings", "view") ? "settings.html" : "#") + '" title="Tally Prime connection"><span id="tally-dot" class="dot"></span><span id="tally-label">Checking Tally…</span></a>' +
         '<div class="sidebar-user"><a class="who-link' + (opts.active === "profile" ? " active" : "") + '" href="profile.html" title="My profile"><div class="avatar">' + esc(initials(user.name)) + '</div><div class="who"><strong>' + esc(user.name) + "</strong><span>" + esc(role ? role.name : "No role") + " · My profile</span></div></a>" +
         '<button class="logout-btn" id="themeToggle" title="Toggle theme">' + icon(isDark() ? "sun" : "moon") + "</button>" +
@@ -208,6 +213,19 @@ var App = (function () {
       '<span class="mobile-brand"><span class="brand-mark">F</span>FebiTally</span>' +
       '<a class="top-avatar" href="profile.html" title="My profile · ' + esc(user.name) + '">' + esc(initials(user.name)) + "</a>";
 
+    // Mobile view: the main modules sit in a bottom tab bar; "More" opens the full menu.
+    if (mobileView) {
+      var TABS = [["dashboard", "Home"], ["statement", "Import"], ["ledger", "Ledgers"], ["salespurchase", "Vouchers"]];
+      var tabs = TABS.filter(function (t) { return t[0] === "dashboard" || can(t[0], "view"); }).map(function (t) {
+        var n = NAV.filter(function (x) { return x.key === t[0]; })[0];
+        return '<a class="tab' + (n.key === opts.active ? " active" : "") + '" href="' + n.href + '"' + (n.key === opts.active ? ' aria-current="page"' : "") + ">" + icon(n.icon) + "<span>" + t[1] + "</span></a>";
+      }).join("");
+      var inTabs = TABS.some(function (t) { return t[0] === opts.active; });
+      document.body.insertAdjacentHTML("beforeend", '<nav class="tabbar" aria-label="Main">' + tabs +
+        '<button type="button" class="tab' + (inTabs ? "" : " active") + '" id="tabMore">' + icon("more") + "<span>More</span></button></nav>");
+      document.getElementById("tabMore").addEventListener("click", function () { document.body.classList.add("nav-open"); });
+    }
+
     if (viewOnly) {
       var head = document.querySelector(".page-head");
       if (head) {
@@ -218,6 +236,12 @@ var App = (function () {
     }
 
     document.getElementById("logoutBtn").addEventListener("click", logout);
+    if (window.FebiView) document.getElementById("viewSwitch").addEventListener("click", function () {
+      var next = mobileView ? "web" : "mobile";
+      FebiView.set(next);
+      var page = location.pathname.split("/").pop() + location.search + location.hash;
+      FebiView.go(next === "mobile" ? "mobile.html?p=" + encodeURIComponent(page) : page);
+    });
     document.getElementById("themeToggle").addEventListener("click", toggleTheme);
     document.getElementById("menuToggle").addEventListener("click", function () { document.body.classList.toggle("nav-open"); });
 

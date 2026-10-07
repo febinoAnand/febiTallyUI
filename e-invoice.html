@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/style.css">
+<script src="assets/js/view.js"></script>
 </head>
 <body>
 <div class="layout">
@@ -18,7 +19,7 @@
       <div class="page-head">
         <h1>e-Invoice</h1>
         <div class="page-actions">
-          <button class="btn btn-primary" id="bulkBtn" disabled data-perm="create"><span data-icon="zap"></span>Generate IRN for selected</button>
+          <button class="btn btn-primary" id="bulkBtn" data-perm="create"><span data-icon="zap"></span>Generate IRN</button>
         </div>
       </div>
 
@@ -145,10 +146,15 @@
     syncBulk();
   }
 
+  function pendingIds() { return sales().filter(function (v) { return statusOf(v) === "Pending"; }).map(function (v) { return v.id; }); }
+
+  // With rows ticked the button works on those; otherwise it offers all pending B2B invoices.
   function syncBulk() {
-    var n = document.querySelectorAll(".row-check:checked").length;
-    $("bulkBtn").disabled = n === 0;
-    $("bulkBtn").lastChild.textContent = n ? "Generate IRN for " + n + " selected" : "Generate IRN for selected";
+    var n = document.querySelectorAll(".row-check:checked").length, all = pendingIds().length;
+    var btn = $("bulkBtn");
+    btn.disabled = !n && !all;
+    btn.title = !n && !all ? "Every B2B invoice already has an IRN" : n ? "" : "Tick invoices below to generate only those";
+    btn.lastChild.textContent = n ? "Generate IRN for " + n + " selected" : all ? "Generate IRN for all pending (" + all + ")" : "All IRNs generated";
   }
 
   $("statusTabs").addEventListener("click", function (e) {
@@ -172,7 +178,12 @@
     if (b.dataset.view) openView(b.dataset.view);
   });
   $("bulkBtn").addEventListener("click", function () {
-    generate(Array.prototype.map.call(document.querySelectorAll(".row-check:checked"), function (c) { return c.value; }));
+    var ticked = Array.prototype.map.call(document.querySelectorAll(".row-check:checked"), function (c) { return c.value; });
+    if (ticked.length) { generate(ticked); return; }
+    var all = pendingIds();
+    if (!all.length) return;
+    App.confirm({ title: "Generate IRN for all pending invoices?", message: all.length + " B2B invoice" + (all.length > 1 ? "s" : "") + " will be registered on the Invoice Registration Portal.", detail: "To pick specific invoices, cancel and tick them in the Pending list.", ok: "Generate " + all.length })
+      .then(function (ok) { if (ok) generate(all); });
   });
 
   /* Simulated IRP round-trip: validate → sign → register. */
