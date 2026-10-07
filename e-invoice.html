@@ -19,78 +19,207 @@
       <div class="page-head">
         <h1>e-Invoice</h1>
         <div class="page-actions">
-          <button class="btn btn-primary" id="bulkBtn" data-perm="create"><span data-icon="zap"></span>Generate IRN</button>
+          <button class="btn btn-ghost" id="jsonAllBtn"><span data-icon="download"></span>Bulk JSON</button>
         </div>
       </div>
 
-      <div class="alert-bar" id="gstinAlert" style="background:var(--warn-soft);color:var(--warn);border-left-color:var(--warn)">
-        <span data-icon="alert"></span>
-        <span>Your company has no GSTIN on file. In a live setup, e-Invoice needs a registered GSTIN.</span>
+      <div class="alert-bar show" id="sellerAlert" style="display:none;background:var(--warn-soft);color:var(--warn);border-left-color:var(--warn)">
+        <span data-icon="alert"></span><span id="sellerAlertText"></span>
       </div>
 
-      <div class="stat-grid" id="statGrid"></div>
+      <div class="card flowbar" id="flowbar">
+        <div class="flowbar-top">
+          <div class="fb-working"><span class="fb-working-label">Working on</span><select id="invPick" class="select-sm" aria-label="Invoice you are working on"></select><span id="workBadge"></span></div>
+          <span class="muted small fb-help">Follow the steps in order — finished steps fold up, the next one opens.</span>
+        </div>
+        <div id="flowbarSteps"></div>
+      </div>
 
-      <div class="card">
-        <div class="card-head">
-          <div class="segmented" id="statusTabs">
-            <button class="active" data-s="Pending">Pending</button>
-            <button data-s="Generated">Generated</button>
-            <button data-s="Cancelled">Cancelled</button>
-            <button data-s="NA">B2C / Not applicable</button>
+      <div class="flow">
+        <!-- 1 · Import -->
+        <section class="card flow-step" id="step1">
+          <div class="card-head"><div class="flow-title"><span class="flow-num">1</span><div>Import Tally file<small>Choose the invoice to e-invoice: upload a Tally export, or pick one already in your books</small></div></div></div>
+          <div class="card-body">
+            <div class="flow-grid">
+              <div class="flow-main" data-perm="create">
+                <div class="choice-label"><span class="choice-tag">A</span>Upload a Tally file</div>
+                <label class="dropzone" id="dropzone">
+                  <input type="file" id="tallyFile" accept=".xml,.json,.csv,.xlsx,.xlsm,.xls,text/xml,text/csv,application/json">
+                  <div class="dropzone-icon" data-icon="upload"></div>
+                  <strong>Drop the Tally export here, or click to choose</strong>
+                  <p><b>XML</b> (Tally Day Book / vouchers export) · <b>Excel</b> (NIC bulk tool, Format A) · <b>JSON</b> (Tally or IRP format) · <b>CSV</b> (one row per item)</p>
+                </label>
+                <div class="flow-actions" style="justify-content:center">
+                  <button class="btn btn-ghost btn-sm" id="sampleXmlBtn"><span data-icon="download"></span>Sample Tally XML</button>
+                  <button class="btn btn-ghost btn-sm" id="sampleCsvBtn"><span data-icon="download"></span>Sample CSV</button>
+                </div>
+                <div id="importResult"></div>
+                <div class="choice-label" style="margin-top:22px"><span class="choice-tag">B</span>Or use an invoice already in your books</div>
+                <div class="book-pick"><select id="bookPick" class="select-sm" aria-label="Invoice from your books"></select><button type="button" class="btn btn-outline btn-sm" id="bookUse">Use this invoice</button></div>
+              </div>
+              <aside class="flow-side"><div class="flow-side-title">Invoices ready to map</div><div id="importSide"></div></aside>
+            </div>
           </div>
-          <div class="search-box"><span data-icon="search"></span><input type="text" id="search" placeholder="Search invoice or party…"></div>
-        </div>
-        <div class="table-wrap">
-          <table class="table stack-sm">
-            <thead><tr><th style="width:36px"><input type="checkbox" id="checkAll" data-perm="create"></th><th>Invoice</th><th>Date</th><th>Buyer</th><th>Buyer GSTIN</th><th class="num">Value</th><th>Status</th><th></th></tr></thead>
-            <tbody id="body"></tbody>
-          </table>
-        </div>
+        </section>
+
+        <!-- 2 · Mapping -->
+        <section class="card flow-step" id="step2">
+          <div class="card-head">
+            <div class="flow-title"><span class="flow-num">2</span><div>JSON mapping<small id="invSub">Tally fields → IRP JSON (schema v1.1)</small></div></div>
+          </div>
+          <div class="card-body">
+            <div class="segmented flow-tabs" id="detailTabs">
+              <button class="active" data-t="map">Mapping</button><button data-t="doc">Document</button><button data-t="sup">Supplier</button><button data-t="buy">Buyer</button><button data-t="items">Items</button><button data-t="tax">Tax &amp; Total</button>
+            </div>
+            <div id="tab-map" class="detail-tab"><div class="table-wrap"><table class="table stack-sm map-table-grid" id="mapTable"></table></div></div>
+            <div id="tab-doc" class="detail-tab hidden">
+              <div class="field-grid cols-4">
+                <div class="field"><label>Document Type</label><select id="dTyp" disabled><option value="INV">Invoice</option><option value="CRN">Credit Note</option><option value="DBN">Debit Note</option></select></div>
+                <div class="field"><label>Invoice Number</label><input type="text" id="dNo" class="mono" disabled></div>
+                <div class="field"><label>Invoice Date</label><input type="text" id="dDt" disabled></div>
+                <div class="field"><label for="dSup">Supply Type</label><select id="dSup"><option value="B2B">B2B</option><option value="SEZWP">SEZ with payment</option><option value="SEZWOP">SEZ without payment</option><option value="EXPWP">Export with payment</option><option value="EXPWOP">Export without payment</option><option value="DEXP">Deemed export</option></select></div>
+                <div class="field"><label for="dRev">Reverse Charge</label><select id="dRev"><option value="N">No</option><option value="Y">Yes</option></select></div>
+                <div class="field"><label for="dIgst">IGST on intra-state</label><select id="dIgst"><option value="N">No</option><option value="Y">Yes</option></select></div>
+              </div>
+            </div>
+            <div id="tab-sup" class="detail-tab hidden"><dl class="kv" id="supKv"></dl><p class="flow-hint">Seller details always come from <a href="profile.html">My profile → Company details</a>.</p></div>
+            <div id="tab-buy" class="detail-tab hidden">
+              <dl class="kv" id="buyKv"></dl>
+              <form id="buyerFix" novalidate style="margin-top:16px">
+                <div class="field-grid">
+                  <div class="field full"><label for="bAddr1">Address line 1 <span class="req">*</span></label><input type="text" id="bAddr1" maxlength="100"></div>
+                  <div class="field full"><label for="bAddr2">Address line 2</label><input type="text" id="bAddr2" maxlength="100"></div>
+                  <div class="field"><label for="bLoc">City / Location <span class="req">*</span></label><input type="text" id="bLoc" maxlength="100"></div>
+                  <div class="field"><label for="bPin">PIN Code</label><input type="text" id="bPin" maxlength="6" inputmode="numeric" class="mono"></div>
+                </div>
+                <button type="submit" class="btn btn-outline btn-sm" style="margin-top:12px"><span data-icon="check"></span>Save buyer address</button>
+                <span class="muted small" id="buyerFixNote" style="margin-left:8px"></span>
+              </form>
+            </div>
+            <div id="tab-items" class="detail-tab hidden">
+              <div class="table-wrap"><table class="table stack-sm" id="itemsTable"></table></div>
+              <div class="flow-actions" id="itemFixBar"><button class="btn btn-outline btn-sm" id="itemFixBtn"><span data-icon="check"></span>Save HSN / unit fixes</button><span class="muted small">Fix codes Tally didn't export, then re-check.</span></div>
+            </div>
+            <div id="tab-tax" class="detail-tab hidden"><dl class="kv" id="taxKv"></dl></div>
+
+            <div class="section-label" style="margin-top:22px">IRP JSON</div>
+            <div id="jsonStatus"></div>
+            <div id="jsonIssues"></div>
+            <pre class="console json-pre" id="jsonPre"></pre>
+            <div class="flow-actions">
+              <button class="btn btn-ghost btn-sm" id="genJsonBtn"><span data-icon="refresh"></span>Rebuild JSON</button>
+              <button class="btn btn-ghost btn-sm" id="viewJsonBtn"><span data-icon="eye"></span>View JSON</button>
+              <button class="btn btn-ghost btn-sm" id="copyJsonBtn"><span data-icon="copy"></span>Copy JSON</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- 3 · Token -->
+        <section class="card flow-step" id="step3">
+          <div class="card-head"><div class="flow-title"><span class="flow-num">3</span><div>Token<small>API credentials and the IRP auth token (simulated)</small></div></div></div>
+          <div class="card-body">
+            <div id="cfgHost"></div>
+            <div class="section-label" style="margin-top:22px">Authentication</div>
+            <div id="authHost"></div>
+          </div>
+        </section>
+
+        <!-- 4 · IRN -->
+        <section class="card flow-step" id="step4">
+          <div class="card-head"><div class="flow-title"><span class="flow-num">4</span><div>IRN<small>Send the JSON to the IRP and get the Invoice Reference Number (simulated)</small></div></div></div>
+          <div class="card-body">
+            <div class="flow-grid">
+              <div class="flow-main">
+                <button class="btn btn-primary" id="irnBtn" data-perm="create"><span data-icon="zap"></span>Generate IRN</button>
+                <ul class="flow-miss" id="irnNeeds"></ul>
+                <div id="irnInfo"></div>
+                <ol class="irp-log" id="irpLog"></ol>
+              </div>
+              <aside class="flow-side"><div class="flow-side-title">IRN</div><div id="irnSide"></div></aside>
+            </div>
+          </div>
+        </section>
+
+        <!-- 5 · QR -->
+        <section class="card flow-step" id="step5">
+          <div class="card-head"><div class="flow-title"><span class="flow-num">5</span><div>QR code<small>The signed QR printed on the invoice</small></div></div></div>
+          <div class="card-body">
+            <div class="flow-grid qr-grid">
+              <div class="qr-box qr-big"><canvas id="qrCanvas" width="25" height="25"></canvas><div class="flow-actions" style="justify-content:center"><button class="btn btn-ghost btn-sm" id="qrPngBtn"><span data-icon="download"></span>Download QR</button></div></div>
+              <div><div class="flow-side-title">What the QR carries</div><dl class="kv" id="qrKv"></dl></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 6 · Response -->
+        <section class="card flow-step" id="step6">
+          <div class="card-head"><div class="flow-title"><span class="flow-num">6</span><div>Response<small>What the IRP returns</small></div></div></div>
+          <div class="card-body">
+            <dl class="kv resp-kv" id="respKv"></dl>
+            <pre class="console json-pre" id="respPre"></pre>
+            <div class="flow-actions">
+              <button class="btn btn-ghost btn-sm" id="respCopyBtn"><span data-icon="copy"></span>Copy response</button>
+              <button class="btn btn-ghost btn-sm" id="respDlBtn"><span data-icon="download"></span>Download response</button>
+            </div>
+            <div id="cancelBox" class="note-box hidden" data-perm="delete" style="margin-top:16px">
+              <div class="note-title"><span data-icon="alert"></span>Cancel IRN</div>
+              <p class="muted" style="margin:0 0 10px;font-size:12.5px">Allowed within 24 hours of generation. The same number can't get a new IRN afterwards — issue a credit note instead.</p>
+              <div style="display:flex;gap:10px;flex-wrap:wrap">
+                <select class="select-sm" id="cancelReason" style="flex:1;min-width:180px"><option value="1">Duplicate</option><option value="2">Data entry mistake</option><option value="3">Order cancelled</option><option value="4">Others</option></select>
+                <button class="btn btn-danger btn-sm" id="cancelBtn"><span data-icon="x"></span>Cancel IRN</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 7 · Print / Download -->
+        <section class="card flow-step" id="step7">
+          <div class="card-head"><div class="flow-title"><span class="flow-num">7</span><div>Print / Download<small>The e-invoice with IRN and QR</small></div></div></div>
+          <div class="card-body">
+            <div class="flow-actions" style="margin-top:0">
+              <button class="btn btn-primary btn-sm" id="printBtn"><span data-icon="printer"></span>Print e-Invoice</button>
+              <button class="btn btn-outline btn-sm" id="pdfBtn"><span data-icon="download"></span>Download PDF</button>
+              <button class="btn btn-ghost btn-sm" id="dlReqBtn"><span data-icon="download"></span>Request JSON</button>
+              <button class="btn btn-ghost btn-sm" id="dlRespBtn"><span data-icon="download"></span>Response JSON</button>
+              <span style="flex:1"></span>
+              <button class="btn btn-outline btn-sm" id="nextInvBtn"><span data-icon="arrowRight"></span>Start next invoice</button>
+            </div>
+            <p class="flow-hint" id="printHint"></p>
+          </div>
+        </section>
+
+        <!-- Register -->
+        <div class="section-label" style="margin:8px 0 0">All invoices</div>
+        <section class="card" id="register">
+          <div class="card-head">
+            <div class="segmented" id="statusTabs">
+              <button class="active" data-s="Pending">Pending</button><button data-s="Generated">Generated</button><button data-s="Cancelled">Cancelled</button><button data-s="NA">B2C / Not applicable</button>
+            </div>
+            <div class="toolbar">
+              <div class="search-box"><span data-icon="search"></span><input type="text" id="search" placeholder="Search invoice or party…"></div>
+              <button class="btn btn-primary btn-sm" id="bulkBtn" data-perm="create"><span data-icon="zap"></span>Generate IRN</button>
+            </div>
+          </div>
+          <div class="stat-grid flat" id="statGrid"></div>
+          <div class="table-wrap">
+            <table class="table stack-sm">
+              <thead><tr><th style="width:36px"><input type="checkbox" id="checkAll" data-perm="create" aria-label="Select all"></th><th>Invoice</th><th>Date</th><th>Buyer</th><th>Buyer GSTIN</th><th class="num">Value</th><th>Status</th><th></th></tr></thead>
+              <tbody id="body"></tbody>
+            </table>
+          </div>
           <div id="listPager"></div>
+        </section>
       </div>
 
     </main>
   </div>
 </div>
 
-<div class="modal-overlay" id="viewModal">
+<div class="modal-overlay" id="jsonModal">
   <div class="modal lg">
-    <div class="modal-head"><h3 id="viewTitle">e-Invoice</h3><button class="icon-btn" data-close="viewModal" data-icon="x"></button></div>
-    <div class="modal-body">
-      <div style="display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start">
-        <div style="text-align:center">
-          <canvas class="qr" id="qrCanvas"></canvas>
-          <div class="muted" style="font-size:11px;margin-top:6px">Signed QR code</div>
-        </div>
-        <dl class="kv" style="flex:1;min-width:260px" id="irnDetails"></dl>
-      </div>
-      <div id="cancelBox" data-perm="delete" class="note-box" style="margin:20px 0 0">
-        <div class="note-title"><span data-icon="alert"></span>Cancel IRN</div>
-        <p class="muted" style="margin:0 0 10px;font-size:12.5px">An IRN can only be cancelled within 24 hours of generation. After that, issue a credit note instead.</p>
-        <div style="display:flex;gap:10px;flex-wrap:wrap">
-          <select class="select-sm" id="cancelReason" style="flex:1;min-width:180px">
-            <option value="1">Duplicate</option><option value="2">Data entry mistake</option><option value="3">Order cancelled</option><option value="4">Others</option>
-          </select>
-          <button class="btn btn-danger btn-sm" id="cancelBtn"><span data-icon="x"></span>Cancel IRN</button>
-        </div>
-      </div>
-    </div>
-    <div class="modal-foot">
-      <button class="btn btn-ghost" id="jsonBtn"><span data-icon="download"></span>Download JSON</button>
-      <span style="flex:1"></span>
-      <button class="btn btn-ghost" data-close="viewModal">Close</button>
-      <button class="btn btn-primary" id="printBtn"><span data-icon="printer"></span>Print e-Invoice</button>
-    </div>
-  </div>
-</div>
-
-<div class="modal-overlay" id="progressModal">
-  <div class="modal" style="max-width:420px;text-align:center">
-    <div class="modal-body" style="padding:34px 26px">
-      <div style="width:54px;height:54px;margin:0 auto 16px;border-radius:50%;border:4px solid var(--brand-soft);border-top-color:var(--brand);animation:spin 0.9s linear infinite"></div>
-      <h3 style="font-size:17px">Connecting to IRP…</h3>
-      <p class="muted" id="progressText" style="margin:6px 0 0;font-size:13px">Validating invoice schema</p>
-    </div>
+    <div class="modal-head"><h3 id="jsonModalTitle">JSON</h3><button class="icon-btn" data-close="jsonModal" aria-label="Close" data-icon="x"></button></div>
+    <div class="modal-body"><pre class="console" id="jsonModalBody"></pre></div>
+    <div class="modal-foot"><button class="btn btn-ghost" id="jsonModalCopy"><span data-icon="copy"></span>Copy</button><span style="flex:1"></span><button class="btn btn-primary" data-close="jsonModal">Close</button></div>
   </div>
 </div>
 
@@ -98,175 +227,597 @@
 <script src="assets/js/app.js"></script>
 <script src="assets/js/tally.js"></script>
 <script src="assets/js/items.js"></script>
+<script src="assets/js/reader.js"></script>
+<script src="assets/js/einvoice.js"></script>
+<script src="assets/js/gstapi.js"></script>
+<script src="assets/js/flowui.js"></script>
 <script>
   var tenant = App.renderShell({ active: "einvoice", title: "e-Invoice", subtitle: "GST compliance · IRN" });
   var $ = function (id) { return document.getElementById(id); };
   var listPg = App.pager("listPager", render, {});
-  var status = "Pending", viewingId = null;
-  if (!tenant.gstin) $("gstinAlert").classList.add("show");
+  var status = "Pending", currentKey = (function () { try { return sessionStorage.getItem("einvCurrent") || null; } catch (e) { return null; } })(), overrides = {}, lastJson = null, lastImport = null;
 
-  function statusOf(v) {
-    if (!v.partyGstin) return "NA";
-    return v.einvoice ? v.einvoice.status : "Pending";
+  /* Demo company: give the seller and the demo buyers the addresses the IRP needs (once). */
+  (function demoAddresses() {
+    if (tenant.tenantId !== Data.DEMO_TENANT || Data.obj("demoAddresses", false)) return;
+    Data.setObj("demoAddresses", true);
+    if (!tenant.addr1) { Data.updateTenant(tenant.tenantId, { addr1: "No. 8, Anna Salai", addr2: "Teynampet", location: "Chennai", pin: "600018" }); tenant = Data.findTenant(tenant.tenantId); }
+    var ADDR = {
+      "Lakshmi Stores": { addr1: "12, Gandhi Road", location: "Erode", pin: "638001" },
+      "Metro Distributors": { addr1: "45, 2nd Cross, Peenya Industrial Area", location: "Bengaluru", pin: "560058" },
+      "Sharma Enterprises": { addr1: "B-14, Okhla Industrial Area Phase II", location: "New Delhi", pin: "110020" }
+    };
+    Data.list("ledgers").forEach(function (l) { if (ADDR[l.name] && !l.addr1) Data.update("ledgers", l.id, ADDR[l.name]); });
+  })();
+
+  /* ---------------- Data: invoices from the books + invoices imported from Tally files ---------------- */
+  function rows() {
+    var v = Data.list("vouchers").filter(function (x) { return x.type === "Sales"; }).map(function (x) {
+      return { key: "v:" + x.id, kind: "voucher", rec: x, number: x.number, date: x.date, party: x.party, gstin: x.partyGstin, state: x.partyState, total: x.total, einvoice: x.einvoice, source: "Books" };
+    });
+    var f = Data.list("einvDocs").map(function (x) {
+      return { key: "f:" + x.id, kind: "file", rec: x, number: x.number, date: x.date, party: x.party, gstin: x.gstin, state: x.state, total: x.total, einvoice: x.einvoice, source: x.source || "File" };
+    });
+    var h = Data.list("einvHistory").map(function (x) {
+      return { key: "h:" + x.id, kind: "history", rec: x, number: x.number, date: x.date, party: x.party, gstin: x.gstin, state: x.state, total: x.total, einvoice: x.einvoice, source: "Re-issued as " + x.reissuedAs };
+    });
+    return v.concat(f, h);
   }
-  function sales() { return Data.list("vouchers").filter(function (v) { return v.type === "Sales"; }); }
+  function byKey(key) { return rows().filter(function (r) { return r.key === key; })[0]; }
+  function statusOf(r) { if (!r.gstin) return "NA"; return r.einvoice ? r.einvoice.status : "Pending"; }
+  function buyerOf(r) {
+    var l = App.findLedger(r.party) || {};
+    return { gstin: r.gstin || l.gstin, name: r.party, addr1: l.addr1, addr2: l.addr2, location: l.location, pin: l.pin, state: r.state || l.state, phone: l.phone, email: l.email };
+  }
+  function jsonFor(r) {
+    if (r.einvoice && r.einvoice.json) return r.einvoice.json;
+    var o = overrides[r.key] || {};
+    if (r.kind === "file") {
+      var j = r.rec.doc ? EInvoice.buildDoc(r.rec.doc, tenant) : JSON.parse(JSON.stringify(r.rec.json));
+      if (o.supTyp) j.TranDtls.SupTyp = o.supTyp;
+      if (o.regRev) j.TranDtls.RegRev = o.regRev;
+      return j;
+    }
+    var x = r.rec;
+    return EInvoice.build({ number: x.number, date: x.date, items: x.items, partyState: x.partyState }, tenant, buyerOf(r),
+      { totInvVal: x.total, supTyp: o.supTyp, regRev: o.regRev === "Y", igstOnIntra: o.igstOnIntra === "Y" });
+  }
+  function issued(exceptKey) {
+    return rows().filter(function (r) { return r.einvoice && r.key !== exceptKey; }).map(function (r) {
+      var j = r.einvoice.json || jsonFor(r);
+      return { typ: j.DocDtls.Typ, no: j.DocDtls.No, fy: EInvoice.fyOf(EInvoice.isoFromDdmm(j.DocDtls.Dt)), status: r.einvoice.status };
+    });
+  }
+  function check(r) { var j = jsonFor(r); return { json: j, errors: r.einvoice ? [] : EInvoice.validate(j, { issued: issued(r.key) }) }; }
 
-  function renderStats() {
-    var s = sales(), c = { Pending: 0, Generated: 0, Cancelled: 0, NA: 0 };
-    s.forEach(function (v) { c[statusOf(v)]++; });
-    var items = [
-      { label: "Pending IRN", value: c.Pending, sub: "B2B invoices awaiting IRN", icon: "clock", tone: "warn" },
-      { label: "IRN Generated", value: c.Generated, sub: "Registered on IRP", icon: "checkCircle", tone: "good" },
-      { label: "Cancelled", value: c.Cancelled, sub: "Cancelled within 24h", icon: "x", tone: "bad" },
-      { label: "B2C / Exempt", value: c.NA, sub: "No buyer GSTIN", icon: "users", tone: "info" }
-    ];
-    $("statGrid").innerHTML = items.map(function (x) {
-      return '<div class="stat-card" style="--tint:var(--' + x.tone + ')"><div class="stat-top"><span class="stat-label">' + x.label + '</span><span class="stat-icon tone-' + x.tone + '">' + App.icon(x.icon) + '</span></div><div class="stat-value">' + x.value + '</div><div class="stat-sub">' + x.sub + "</div></div>";
+  function renderSellerAlert() {
+    var miss = [];
+    if (!tenant.gstin) miss.push("GSTIN"); if (!tenant.addr1) miss.push("address"); if (!tenant.location) miss.push("city"); if (!tenant.pin) miss.push("PIN code");
+    $("sellerAlert").style.display = miss.length ? "" : "none";
+    $("sellerAlertText").innerHTML = "The IRP needs your company's " + miss.join(", ") + ". Add " + (miss.length > 1 ? "them" : "it") + " in <a href=\"profile.html\">My profile → Company details</a>.";
+  }
+
+  /* =====================================================
+     1 · Import Tally file
+     ===================================================== */
+  function readTallyFile(file) {
+    var name = file.name, ext = (name.split(".").pop() || "").toLowerCase();
+    var done = function (docs, kind) {
+      if (!docs.length) throw new Error("No sales, credit-note or debit-note vouchers found in " + name + ".");
+      var saved = docs.map(function (d) {
+        var json = EInvoice.buildDoc(d, tenant);
+        var existing = Data.list("einvDocs").filter(function (x) { return x.number === d.number && x.typ === d.typ; })[0];
+        var rec = { number: d.number, typ: d.typ, date: d.date, party: d.buyer.name, gstin: d.buyer.gstin, state: d.buyer.state || d.partyState, total: json.ValDtls.TotInvVal, doc: d, source: d.source || kind, file: name };
+        if (existing && existing.einvoice) return { id: existing.id, kept: true };
+        var r = existing ? (Data.update("einvDocs", existing.id, rec), existing) : Data.add("einvDocs", rec);
+        return { id: r.id };
+      });
+      lastImport = { file: name, kind: kind, at: new Date().toISOString(), ids: saved.map(function (x) { return x.id; }), kept: saved.filter(function (x) { return x.kept; }).length };
+      Data.setObj("einvLastImport", lastImport);
+      var first = saved.filter(function (x) { return !x.kept; })[0];
+      if (first) currentKey = "f:" + first.id;
+      App.toast(docs.length + " invoice" + (docs.length > 1 ? "s" : "") + " read from " + name + ".");
+      refreshAll(true);
+      if (first) flow.go(1, true);
+    };
+    var fail = function (e) { App.toast(e.message || "Couldn't read that file.", "bad"); };
+    if (/^(xlsx|xlsm|xls)$/.test(ext)) {
+      return Promise.all([Reader.xlsx(), Reader.readAs(file, "buffer")]).then(function (res) {
+        var XLSX = res[0], wb = XLSX.read(res[1], { type: "array" });
+        done(EInvoice.fromFormA(XLSX, wb), "Format A");
+      }).catch(fail);
+    }
+    Reader.readAs(file, "text").then(function (text) {
+      text = String(text).replace(/^\uFEFF/, "");
+      if (ext === "csv" || (!/^\s*[<\[{]/.test(text) && text.indexOf(",") !== -1)) {
+        // A CSV saved from the bulk tool keeps its col… codes; anything else is read as a plain invoice CSV.
+        if (/\bcolDocno\b/.test(text)) return Reader.xlsx().then(function (XLSX) { done(EInvoice.fromFormA(XLSX, XLSX.read(text, { type: "string" })), "Format A CSV"); });
+        return done(EInvoice.fromInvoiceCsv(App.parseCSV(text)), "CSV");
+      }
+      if (/^\s*</.test(text)) return done(EInvoice.fromTallyXml(text), "Tally XML");
+      var obj = JSON.parse(text);
+      var irp = EInvoice.fromIrpJson(obj);
+      done(irp.length ? irp : EInvoice.fromTallyJson(obj), irp.length ? "IRP JSON" : "Tally JSON");
+    }).catch(function (e) { fail(e instanceof SyntaxError ? new Error(name + " isn't valid XML or JSON.") : e); });
+  }
+  $("tallyFile").addEventListener("change", function () { var f = this.files[0]; this.value = ""; if (f) readTallyFile(f); });
+  ["dragenter", "dragover"].forEach(function (ev) { $("dropzone").addEventListener(ev, function (e) { e.preventDefault(); $("dropzone").classList.add("drag"); }); });
+  ["dragleave", "drop"].forEach(function (ev) { $("dropzone").addEventListener(ev, function (e) { e.preventDefault(); $("dropzone").classList.remove("drag"); }); });
+  $("dropzone").addEventListener("drop", function (e) { if (e.dataTransfer.files[0]) readTallyFile(e.dataTransfer.files[0]); });
+  $("sampleXmlBtn").addEventListener("click", function () {
+    var vs = Data.list("vouchers").filter(function (v) { return v.type === "Sales" && v.partyGstin && !v.einvoice; }).slice(-3);
+    if (!vs.length) return App.toast("No pending B2B invoices in your books to export.", "info");
+    App.downloadFile("Tally_Sales_Vouchers.xml", EInvoice.toTallyXml(vs, App.findLedger), "text/xml");
+    App.toast("Sample Tally XML with " + vs.length + " invoices downloaded — drop it back here to try the flow.");
+  });
+  $("sampleCsvBtn").addEventListener("click", function () {
+    var vs = Data.list("vouchers").filter(function (v) { return v.type === "Sales" && v.partyGstin && !v.einvoice; }).slice(-3);
+    if (!vs.length) return App.toast("No pending B2B invoices in your books to export.", "info");
+    var esc = function (v) { v = String(v == null ? "" : v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+    var lines = ["Invoice No,Invoice Date,Buyer GSTIN,Buyer Name,Address,City,PIN,Place of Supply,Item,HSN,Qty,Unit,Rate,GST %,Invoice Value"];
+    vs.forEach(function (v) { var l = App.findLedger(v.party) || {}; (v.items || []).forEach(function (it) { lines.push([v.number, EInvoice.ddmmyyyy(v.date), v.partyGstin, v.party, l.addr1, l.location, l.pin, v.partyState, it.name, it.hsn, it.qty, it.unit, it.rate, it.gst, v.total].map(esc).join(",")); }); });
+    App.downloadFile("Sales_Invoices.csv", lines.join("\n"));
+    App.toast("Sample CSV with " + vs.length + " invoices downloaded.");
+  });
+  function renderImport() {
+    var li = lastImport || Data.obj("einvLastImport", null), all = rows();
+    var pend = all.filter(function (r) { return statusOf(r) === "Pending"; });
+    var books = pend.filter(function (r) { return r.kind === "voucher"; }).length, files = pend.length - books;
+    $("importSide").innerHTML = '<dl class="kv tight"><dt>From your books</dt><dd>' + books + " pending</dd><dt>From Tally files</dt><dd>" + files + " pending</dd>" +
+      (li ? "<dt>Last import</dt><dd>" + App.esc(li.file) + "<br><span class='muted small'>" + li.kind + " · " + App.ago(li.at) + "</span></dd>" : "") + "</dl>";
+    var docs = li ? li.ids.map(function (id) { return byKey("f:" + id); }).filter(Boolean) : [];
+    $("importResult").innerHTML = docs.length ? '<div class="section-label" style="margin-top:18px">' + App.esc(li.file) + " · " + docs.length + " invoice" + (docs.length > 1 ? "s" : "") + "</div>" + docs.map(function (r) {
+      var st = statusOf(r), errs = st === "Pending" ? check(r).errors : [];
+      return '<div class="import-doc"><div class="import-doc-head"><span class="mono cell-strong">' + App.esc(r.number) + '</span><span class="muted small">' + App.esc(r.party) + " · " + App.inr(r.total) + "</span>" +
+        (st !== "Pending" ? '<span class="badge badge-muted">IRN ' + st.toLowerCase() + "</span>" : errs.length ? '<span class="badge badge-bad">' + errs.length + " issue" + (errs.length > 1 ? "s" : "") + "</span>" : '<span class="badge badge-good plain">Ready</span>') +
+        '<button class="btn btn-ghost btn-xs" data-open="' + r.key + '">Map ' + App.icon("arrowRight") + "</button></div></div>";
+    }).join("") : "";
+    $("step1").classList.toggle("done", pend.length > 0 || !!li);
+  }
+  $("importResult").addEventListener("click", function (e) { var b = e.target.closest("[data-open]"); if (b) openInFlow(b.dataset.open); });
+
+  /* =====================================================
+     2 · JSON mapping
+     ===================================================== */
+  function fillPick() {
+    var list = rows().filter(function (r) { return statusOf(r) !== "NA"; }).sort(function (a, b) { return b.date.localeCompare(a.date) || b.number.localeCompare(a.number); });
+    var opt = function (r) { return '<option value="' + r.key + '">' + App.esc(r.number) + " · " + App.esc(r.party) + " · " + App.inr0(r.total) + (r.kind === "file" ? " · " + r.source : "") + "</option>"; };
+    var pend = list.filter(function (r) { return statusOf(r) === "Pending"; }), done = list.filter(function (r) { return statusOf(r) !== "Pending"; });
+    if (currentKey && !byKey(currentKey)) currentKey = null;
+    $("invPick").innerHTML = (currentKey ? "" : '<option value="">— Pick an invoice in step 1 —</option>') + (pend.length ? '<optgroup label="Pending IRN">' + pend.map(opt).join("") + "</optgroup>" : "") + (done.length ? '<optgroup label="IRN generated / cancelled">' + done.map(opt).join("") + "</optgroup>" : "");
+    $("invPick").value = currentKey || "";
+  }
+  $("invPick").addEventListener("change", function () { if (this.value) openInFlow(this.value); });
+  function select(key) { currentKey = key || null; try { sessionStorage.setItem("einvCurrent", currentKey || ""); } catch (e) { /* ignore */ } lastJson = null; refreshFlow(true); }
+  function openInFlow(key) { select(key); render(); if (flow) flow.resume(); scrollToOpen(); }
+  function scrollToOpen() { var i = flow ? flow.current() : 1; if (i >= 0) flow.go(i, true); }
+
+  $("detailTabs").addEventListener("click", function (e) {
+    var b = e.target.closest("button"); if (!b) return;
+    $("detailTabs").querySelectorAll("button").forEach(function (x) { x.classList.toggle("active", x === b); });
+    document.querySelectorAll(".detail-tab").forEach(function (t) { t.classList.toggle("hidden", t.id !== "tab-" + b.dataset.t); });
+  });
+  function kv(pairs) { return pairs.map(function (p) { return "<dt>" + p[0] + "</dt><dd" + (p[2] ? ' class="mono"' : "") + ">" + (p[1] === "" || p[1] == null ? '<span class="muted">—</span>' : App.esc(p[1])) + "</dd>"; }).join(""); }
+  function bookMapping(r, j) {
+    var x = r.rec, out = [["Voucher number", "DocDtls.No", x.number], ["Voucher date", "DocDtls.Dt", j.DocDtls.Dt], ["Party ledger", "BuyerDtls.LglNm", x.party], ["Party GSTIN", "BuyerDtls.Gstin", x.partyGstin], ["Place of supply", "BuyerDtls.Pos", x.partyState + " → " + j.BuyerDtls.Pos],
+      ["Ledger address", "BuyerDtls.Addr1", j.BuyerDtls.Addr1], ["Ledger city", "BuyerDtls.Loc", j.BuyerDtls.Loc], ["Ledger PIN", "BuyerDtls.Pin", j.BuyerDtls.Pin]];
+    (x.items || []).forEach(function (it, i) { out.push(["Item name", "ItemList[" + i + "].PrdDesc", it.name], ["Item HSN", "ItemList[" + i + "].HsnCd", it.hsn], ["Qty / unit", "ItemList[" + i + "].Qty / Unit", it.qty + " " + (it.unit || "") + " → " + (EInvoice.uqc(it.unit) || "unknown UQC")], ["Rate", "ItemList[" + i + "].UnitPrice", it.rate], ["GST %", "ItemList[" + i + "].GstRt", it.gst + "%"]); });
+    out.push(["Voucher total", "ValDtls.TotInvVal", x.total]);
+    return out.map(function (m) { return { tally: m[0], path: m[1], value: m[2] == null || m[2] === "" ? "—" : String(m[2]) }; });
+  }
+  function renderDetails() {
+    var r = currentKey && byKey(currentKey);
+    if (!r) { $("invSub").textContent = "Import a Tally file or add invoices in Sales"; $("mapTable").innerHTML = ""; return; }
+    var j = jsonFor(r), locked = !!r.einvoice, isFile = r.kind === "file", doc = isFile && r.rec.doc;
+    $("invSub").textContent = r.party + " · " + (r.gstin || "") + " · source: " + (isFile ? r.source + " (" + (r.rec.file || "") + ")" : "your books");
+    // Mapping table
+    var map = isFile ? (doc && doc.mapping) || [{ tally: "(older import)", path: "—", value: "JSON stored as imported" }] : bookMapping(r, j);
+    $("mapTable").innerHTML = "<thead><tr><th>" + (isFile ? r.source + " field" : "Books field") + "</th><th>IRP JSON field</th><th>Value</th></tr></thead><tbody>" + map.map(function (m) {
+      var missing = /^—/.test(m.value) || /missing|unknown/.test(m.value);
+      return "<tr" + (missing ? ' class="map-missing"' : "") + "><td class='mono' style='font-size:12px'>" + App.esc(m.tally) + "</td><td class='mono' style='font-size:12px'>" + App.esc(m.path) + "</td><td>" + App.esc(m.value) + "</td></tr>";
+    }).join("") + "</tbody>";
+    // Document
+    $("dTyp").value = j.DocDtls.Typ; $("dNo").value = j.DocDtls.No; $("dDt").value = j.DocDtls.Dt;
+    $("dSup").value = j.TranDtls.SupTyp; $("dRev").value = j.TranDtls.RegRev || "N"; $("dIgst").value = j.TranDtls.IgstOnIntra || "N";
+    ["dSup", "dRev", "dIgst"].forEach(function (id) { $(id).disabled = locked || (id === "dIgst" && isFile); });
+    var s = j.SellerDtls, b = j.BuyerDtls;
+    $("supKv").innerHTML = kv([["GSTIN", s.Gstin, 1], ["Legal name", s.LglNm], ["Address", [s.Addr1, s.Addr2].filter(Boolean).join(", ")], ["Location", s.Loc], ["PIN", s.Pin, 1], ["State code", s.Stcd, 1], ["Phone", s.Ph], ["Email", s.Em]]);
+    $("buyKv").innerHTML = kv([["GSTIN", b.Gstin, 1], ["Legal name", b.LglNm], ["Place of supply", b.Pos, 1], ["Address", [b.Addr1, b.Addr2].filter(Boolean).join(", ")], ["Location", b.Loc], ["PIN", b.Pin, 1], ["State code", b.Stcd, 1]]);
+    var canFix = !locked && (r.kind === "voucher" || !!doc);
+    $("buyerFix").classList.toggle("hidden", !canFix);
+    if (canFix) {
+      var bb = r.kind === "voucher" ? buyerOf(r) : doc.buyer;
+      $("bAddr1").value = bb.addr1 || ""; $("bAddr2").value = bb.addr2 || ""; $("bLoc").value = bb.location || ""; $("bPin").value = bb.pin || "";
+      $("buyerFixNote").textContent = r.kind === "voucher" ? "Saved to the party ledger." : "Saved to this imported invoice.";
+    }
+    // Items (HSN / unit editable for imported invoices)
+    var editItems = !locked && !!doc;
+    $("itemFixBar").classList.toggle("hidden", !editItems);
+    $("itemsTable").innerHTML = "<thead><tr><th>#</th><th>Description</th><th>HSN</th><th class='num'>Qty</th><th>Unit (UQC)</th><th class='num'>Rate</th><th class='num'>Taxable</th><th class='num'>GST</th><th class='num'>Total</th></tr></thead><tbody>" +
+      j.ItemList.map(function (it, i) {
+        var hsn = editItems ? "<input class='mono item-fix' data-i='" + i + "' data-f='hsn' value='" + App.esc(it.HsnCd || "") + "' maxlength='8' inputmode='numeric' aria-label='HSN for item " + it.SlNo + "'>" : "<span class='mono'>" + App.esc(it.HsnCd) + "</span>";
+        var unit = editItems ? "<select class='item-fix' data-i='" + i + "' data-f='unit' aria-label='Unit for item " + it.SlNo + "'><option value=''>—</option>" + Object.keys(EInvoice.UQC).map(function (u) { return "<option" + (u === it.Unit ? " selected" : "") + ">" + u + "</option>"; }).join("") + "</select>" : "<span class='mono'>" + (it.Unit || "—") + "</span>";
+        return "<tr><td>" + it.SlNo + "</td><td>" + App.esc(it.PrdDesc || "—") + "</td><td>" + hsn + "</td><td class='num'>" + (it.Qty == null ? "—" : it.Qty) + "</td><td>" + unit + "</td><td class='num'>" + App.inr(it.UnitPrice) + "</td><td class='num'>" + App.inr(it.AssAmt) + "</td><td class='num'>" + it.GstRt + "%</td><td class='num cell-strong'>" + App.inr(it.TotItemVal) + "</td></tr>";
+      }).join("") + "</tbody>";
+    var v = j.ValDtls;
+    $("taxKv").innerHTML = kv([["Taxable value", App.inr(v.AssVal)], ["CGST", App.inr(v.CgstVal || 0)], ["SGST", App.inr(v.SgstVal || 0)], ["IGST", App.inr(v.IgstVal || 0)], ["Cess", App.inr(v.CesVal || 0)], ["Round off", App.inr(v.RndOffAmt || 0)], ["Total invoice value", App.inr(v.TotInvVal)]]);
+  }
+  ["dSup", "dRev", "dIgst"].forEach(function (id) {
+    $(id).addEventListener("change", function () {
+      var o = overrides[currentKey] = overrides[currentKey] || {};
+      o.supTyp = $("dSup").value; o.regRev = $("dRev").value; o.igstOnIntra = $("dIgst").value;
+      lastJson = null; refreshFlow(true);
+    });
+  });
+  $("buyerFix").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var r = byKey(currentKey), patch = { addr1: $("bAddr1").value.trim(), addr2: $("bAddr2").value.trim(), location: $("bLoc").value.trim(), pin: $("bPin").value.trim() };
+    if (r.kind === "voucher") {
+      var l = App.findLedger(r.party);
+      if (!l) return App.toast("Party ledger “" + r.party + "” not found.", "bad");
+      Data.update("ledgers", l.id, patch);
+    } else { var d = r.rec.doc; Object.assign(d.buyer, patch); Data.update("einvDocs", r.rec.id, { doc: d }); }
+    App.toast("Buyer address saved.");
+    lastJson = null; refreshAll(true);
+  });
+  $("itemFixBtn").addEventListener("click", function () {
+    var r = byKey(currentKey), d = r.rec.doc, bad = [];
+    document.querySelectorAll("#itemsTable .item-fix").forEach(function (el) {
+      var it = d.items[Number(el.dataset.i)];
+      if (el.dataset.f === "hsn") { var h = el.value.replace(/\D/g, ""); if (h && !/^(\d{4}|\d{6}|\d{8})$/.test(h)) bad.push(el.value); else it.hsn = h; }
+      else if (el.value) it.unit = el.value;
+    });
+    if (bad.length) return App.toast("HSN must be 4, 6 or 8 digits (check " + bad.join(", ") + ").", "bad");
+    Data.update("einvDocs", r.rec.id, { doc: d });
+    App.toast("Item fixes saved.");
+    lastJson = null; refreshAll(true);
+  });
+
+  var SECTION_ORDER = ["Header", "Transaction", "Document", "Seller", "Buyer", "Items", "Totals", "e-Way Bill"];
+  function renderJson(stale) {
+    stale = false;   // the JSON is always built straight away
+    var r = currentKey && byKey(currentKey);
+    if (!r) { $("jsonPre").textContent = "No invoice selected."; $("jsonStatus").innerHTML = ""; $("jsonIssues").innerHTML = ""; return; }
+    var res = check(r);
+    if (stale && !r.einvoice) { lastJson = null; $("jsonPre").textContent = "Click Generate JSON to build the IRP request for " + r.number + "."; }
+    else { lastJson = res.json; $("jsonPre").textContent = JSON.stringify(res.json, null, 2); }
+    $("step2").classList.toggle("done", !!lastJson && !res.errors.length);
+    var errs = res.errors;
+    $("jsonStatus").innerHTML = r.einvoice ? '<div class="alert-bar show" style="background:var(--good-soft);color:var(--good);border-left-color:var(--good)">' + App.icon("checkCircle") + "<span>IRN already generated — this is the JSON that was sent.</span></div>"
+      : errs.length ? '<div class="alert-bar show" style="background:var(--bad-soft);color:var(--bad);border-left-color:var(--bad)">' + App.icon("alert") + "<span><b>" + errs.length + " issue" + (errs.length > 1 ? "s" : "") + "</b> to fix before the IRP will accept it.</span></div>"
+      : '<div class="alert-bar show" style="background:var(--good-soft);color:var(--good);border-left-color:var(--good)">' + App.icon("checkCircle") + "<span><b>Mapping complete.</b> Passes schema v1.1 and the IRP validations.</span></div>";
+    var groups = {};
+    errs.forEach(function (x) { var g = /^Item /.test(x.section) ? "Items" : x.section; (groups[g] = groups[g] || []).push(x); });
+    $("jsonIssues").innerHTML = Object.keys(groups).sort(function (a, b) { return SECTION_ORDER.indexOf(a) - SECTION_ORDER.indexOf(b); }).map(function (g) {
+      return '<div class="issue-group"><div class="section-label">' + App.esc(g) + '</div><ul class="issue-list">' + groups[g].map(function (x) {
+        return '<li><span class="mono issue-field">' + App.esc((/^Item /.test(x.section) ? x.section.replace("Item ", "#") + " · " : "") + x.field) + "</span>" + App.esc(x.msg) + "</li>";
+      }).join("") + "</ul></div>";
     }).join("");
   }
+  function needJson() { if (!lastJson) renderJson(false); return lastJson; }
+  $("genJsonBtn").addEventListener("click", function () { if (!currentKey) return; renderJson(false); renderIrn(); App.toast("JSON rebuilt for " + byKey(currentKey).number + "."); });
+  function showJson(title, obj) { $("jsonModalTitle").textContent = title; $("jsonModalBody").textContent = JSON.stringify(obj, null, 2); App.openModal("jsonModal"); }
+  function copy(text, what) { var done = function () { App.toast(what + " copied."); }; if (navigator.clipboard) navigator.clipboard.writeText(text).then(done, done); else done(); }
+  $("viewJsonBtn").addEventListener("click", function () { var j = needJson(); if (j) showJson("IRP request · " + j.DocDtls.No, j); });
+  $("copyJsonBtn").addEventListener("click", function () { var j = needJson(); if (j) copy(JSON.stringify(j, null, 2), "JSON"); });
+  $("jsonModalCopy").addEventListener("click", function () { copy($("jsonModalBody").textContent, "JSON"); });
 
-  var BADGE = { Pending: '<span class="badge badge-warn">Pending</span>', Generated: '<span class="badge badge-good">Generated</span>', Cancelled: '<span class="badge badge-bad">Cancelled</span>', NA: '<span class="badge badge-muted">Not applicable</span>' };
+  /* =====================================================
+     3 · Token
+     ===================================================== */
+  var auth;
+  GstApi.mountConfig($("cfgHost"), "einv", function () { auth.refresh(); syncToken(); });
+  auth = GstApi.mountAuth($("authHost"), "einv", syncToken);
+  function syncToken() {
+    renderIrn(); syncBulk();
+    if (!flow) return;
+    flow.refresh();
+    if (GstApi.token("einv") && flow.current() === 2 && mappedOk()) flow.go(3, true);
+  }
 
+  /* =====================================================
+     4 · IRN · 5 · QR · 6 · Response · 7 · Print
+     ===================================================== */
+  var IRP_STEPS = ["Validating JSON against schema v1.1", "Checking the auth token", "Checking for a duplicate IRN", "Signing the invoice", "Registering the IRN"];
+  function suggestNumber(r) {
+    if (r.kind === "voucher") return Data.nextNumber("Sales", App.today());
+    var n = String(r.number), i = 1;
+    var used = function (x) { return rows().some(function (q) { return String(q.number).toUpperCase() === x.toUpperCase(); }); };
+    var cand = (n.length <= 14 ? n + "-R" : n.slice(0, 14) + "R1");
+    while (used(cand) && i < 99) { i++; cand = (n.length <= 13 ? n + "-R" : n.slice(0, 13) + "R") + i; }
+    return cand.slice(0, 16);
+  }
+  function renderIrnInfo(r, e) {
+    if (!e) { $("irnInfo").innerHTML = ""; return; }
+    if (e.status === "Cancelled") {
+      var fy = EInvoice.fyOf(EInvoice.isoFromDdmm((e.json || jsonFor(r)).DocDtls.Dt));
+      var canReissue = r.kind !== "history" && App.can("einvoice", "create");
+      $("irnInfo").innerHTML = '<div class="note-box irn-note"><div class="note-title">' + App.icon("alert") + "IRN cancelled — this number can't get a new IRN</div>" +
+        '<p class="muted small" style="margin:4px 0 12px">Cancelled on ' + App.dateTime(e.cancelledAt) + " (" + App.esc(e.cancelReason || "") + "). The IRP never issues a second IRN for <b>" + App.esc(r.number) + "</b> in FY " + fy + ". " +
+        (r.kind === "history" ? "This invoice was already re-issued as <b>" + App.esc(r.rec.reissuedAs) + "</b>." : "Re-issue the invoice under a new number to generate a fresh IRN — the cancelled IRN stays on record.") + "</p>" +
+        (canReissue ? '<div class="reissue-row"><div class="field"><label for="reNo">New invoice number</label><input type="text" id="reNo" class="mono" maxlength="16" value="' + App.esc(suggestNumber(r)) + '"' + (r.kind === "voucher" ? " readonly title=\"Next number in your Sales series\"" : "") + '></div>' +
+          '<button class="btn btn-primary btn-sm" id="reissueBtn">' + App.icon("refresh") + "Re-issue with new number</button></div>" : "") +
+        '<div class="flow-actions" style="margin-top:10px">' + (r.kind === "history" ? '<button class="btn btn-outline btn-sm" id="toReissued">Open ' + App.esc(r.rec.reissuedAs) + "</button>" : "") +
+        '<button class="btn btn-ghost btn-sm" id="nextPendingBtn">' + App.icon("arrowRight") + "Next pending invoice</button></div></div>";
+    } else {
+      $("irnInfo").innerHTML = '<div class="note-box irn-note ok"><div class="note-title">' + App.icon("checkCircle") + "IRN already generated for " + App.esc(r.number) + "</div>" +
+        '<p class="muted small" style="margin:4px 0 10px">See the QR code, the IRP response and the print in steps 5–7. Need to undo it? Cancel within 24 hours in step 6.</p>' +
+        '<div class="flow-actions" style="margin-top:0"><button class="btn btn-outline btn-sm" id="toQrBtn">' + App.icon("arrowRight") + 'Go to QR code</button><button class="btn btn-ghost btn-sm" id="nextPendingBtn">Next pending invoice</button></div></div>';
+    }
+  }
+  $("irnInfo").addEventListener("click", function (e) {
+    var b = e.target.closest("button"); if (!b) return;
+    if (b.id === "toQrBtn") $("step5").scrollIntoView({ behavior: "smooth", block: "start" });
+    if (b.id === "nextPendingBtn") {
+      var next = rows().filter(function (r) { return statusOf(r) === "Pending"; }).sort(function (a, c) { return c.date.localeCompare(a.date); })[0];
+      if (!next) return App.toast("No pending invoices left.", "info");
+      openInFlow(next.key);
+    }
+    if (b.id === "toReissued") {
+      var r0 = byKey(currentKey), target = rows().filter(function (r) { return r.kind !== "history" && r.number === r0.rec.reissuedAs; })[0];
+      if (target) openInFlow(target.key); else App.toast(r0.rec.reissuedAs + " is no longer in the list.", "info");
+    }
+    if (b.id === "reissueBtn") reissue();
+  });
+  // Moves the invoice to a new number (so the IRP will accept it) and keeps the cancelled IRN as history.
+  function reissue() {
+    var r = byKey(currentKey), e = r.einvoice, newNo = $("reNo").value.trim().toUpperCase();
+    if (!/^([a-zA-Z1-9]{1}[a-zA-Z0-9\/-]{0,15})$/.test(newNo)) return App.toast("Invoice number: up to 16 letters, digits, / or -, not starting with 0, / or -.", "bad");
+    if (rows().some(function (q) { return String(q.number).toUpperCase() === newNo; })) return App.toast(newNo + " is already used. Pick another number.", "bad");
+    App.confirm({ title: "Re-issue " + r.number + " as " + newNo + "?", message: "The invoice moves to the new number and goes back to Pending so you can generate a fresh IRN.", detail: "The cancelled IRN stays on record under the Cancelled tab.", ok: "Re-issue" }).then(function (ok) {
+      if (!ok) return;
+      Data.add("einvHistory", { number: r.number, date: r.date, party: r.party, gstin: r.gstin, state: r.state, total: r.total, einvoice: Object.assign({}, e, { json: e.json || jsonFor(r) }), reissuedAs: newNo, kind: r.kind });
+      if (r.kind === "voucher") {
+        Data.update("vouchers", r.rec.id, { number: newNo, date: App.today(), einvoice: null, reissueOf: r.number });
+      } else {
+        var d = r.rec.doc; if (d) { d.number = newNo; d.date = App.today(); }
+        Data.update("einvDocs", r.rec.id, { number: newNo, date: App.today(), doc: d, einvoice: null, reissueOf: r.number });
+      }
+      currentKey = r.key;
+      App.toast(r.number + " re-issued as " + newNo + ". Generate the JSON and a new IRN.");
+      lastJson = null; refreshAll(true);
+      $("step2").scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
+  function renderIrn() {
+    var r = currentKey && byKey(currentKey), e = r && r.einvoice, needs = [];
+    if (!r) needs.push("Pick an invoice (step 2).");
+    else if (!e) {
+      if (!lastJson) needs.push("Generate the JSON (step 2).");
+      if (check(r).errors.length) needs.push("Fix the mapping issues (step 2).");
+      if (!GstApi.token("einv")) needs.push(GstApi.ready("einv") ? "Generate a token (step 3)." : "Add API credentials and generate a token (step 3).");
+    }
+    $("irnBtn").disabled = !r || !!e || needs.length > 0;
+    $("irnBtn").title = e ? (e.status === "Cancelled" ? "IRN cancelled — re-issue under a new number" : "IRN already generated") : needs.join(" ");
+    $("irnBtn").lastChild.textContent = e ? (e.status === "Cancelled" ? "IRN cancelled" : "IRN generated") : "Generate IRN";
+    renderIrnInfo(r, e);
+    $("irnNeeds").innerHTML = e ? "" : needs.map(function (n) { return "<li>" + n + "</li>"; }).join("");
+    if (!e) $("irpLog").innerHTML = "";
+    $("irnSide").innerHTML = e ? '<dl class="kv tight"><dt>Status</dt><dd>' + (e.status === "Cancelled" ? '<span class="badge badge-bad">Cancelled</span>' : '<span class="badge badge-good">Generated</span>') + "</dd>" +
+      '<dt>IRN</dt><dd class="mono" style="font-size:10.5px;word-break:break-all">' + e.irn + '</dd><dt>Ack No</dt><dd class="mono">' + e.ackNo + "</dd><dt>Ack Date</dt><dd>" + App.dateTime(e.ackDate) + "</dd>" +
+      (e.status === "Cancelled" ? "<dt>Cancelled</dt><dd>" + App.dateTime(e.cancelledAt) + " · " + App.esc(e.cancelReason) + "</dd>" : "") + "</dl>"
+      : '<p class="resp-empty">The 64-character IRN and acknowledgement appear here.</p>';
+    $("step4").classList.toggle("done", !!e);
+    renderQr(r, e); renderResp(r, e); renderPrint(r, e);
+  }
+  function renderQr(r, e) {
+    var has = !!e;
+    $("step5").classList.toggle("done", has);
+    $("qrPngBtn").disabled = !has; $("qrPngBtn").title = has ? "" : "Available after the IRN is generated (step 4)";
+    var ctx = $("qrCanvas").getContext("2d");
+    if (!has) { ctx.clearRect(0, 0, 25, 25); $("qrKv").innerHTML = '<dt>—</dt><dd class="muted">Generated with the IRN.</dd>'; return; }
+    App.drawQr($("qrCanvas"), e.signedQr || e.irn);
+    var q = {}; try { q = JSON.parse(e.signedQr); } catch (x) { /* older record */ }
+    $("qrKv").innerHTML = kv([["Seller GSTIN", q.SellerGstin, 1], ["Buyer GSTIN", q.BuyerGstin, 1], ["Doc no / type", (q.DocNo || r.number) + " · " + (q.DocTyp || "INV"), 1], ["Doc date", q.DocDt], ["Invoice value", q.TotInvVal != null ? App.inr(q.TotInvVal) : ""], ["Items", q.ItemCnt], ["Main HSN", q.MainHsnCode, 1], ["IRN date", q.IrnDt]]);
+  }
+  function b64url(s) { try { return btoa(unescape(encodeURIComponent(s))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); } catch (x) { return ""; } }
+  function jwt(payload) { return b64url(JSON.stringify({ alg: "RS256", kid: "SIMULATED", typ: "JWT" })) + "." + b64url(JSON.stringify(payload)) + "." + Data.fakeHash(JSON.stringify(payload)).slice(0, 43); }
+  function responseOf(r, e) {
+    var req = e.json || jsonFor(r);
+    return { Success: "Y", AckNo: e.ackNo, AckDt: e.ackDate.slice(0, 19).replace("T", " "), Irn: e.irn, SignedInvoice: jwt({ data: JSON.stringify(req) }), SignedQRCode: jwt({ data: e.signedQr || "" }), Status: e.status === "Cancelled" ? "CNL" : "ACT", EwbNo: null, EwbDt: null, EwbValidTill: null, Remarks: e.env === "production" ? null : "Generated in SANDBOX (simulated)" };
+  }
+  function renderResp(r, e) {
+    $("step6").classList.toggle("done", !!e);
+    $("respCopyBtn").disabled = $("respDlBtn").disabled = !e;
+    $("respCopyBtn").title = $("respDlBtn").title = e ? "" : "Available after the IRN is generated (step 4)";
+    $("respKv").innerHTML = e ? kv([["IRN", e.irn, 1], ["Ack No", e.ackNo, 1], ["Ack Date", App.dateTime(e.ackDate)], ["Status", e.status === "Cancelled" ? "Cancelled (CNL)" : "Active (ACT)"]]) : "";
+    $("respPre").textContent = e ? JSON.stringify(responseOf(r, e), null, 2) : "The IRP response (AckNo, AckDt, Irn, SignedInvoice, SignedQRCode, Status) appears here after step 4.";
+    var within24h = e && r.kind !== "history" && e.status === "Generated" && (Date.now() - new Date(e.ackDate).getTime()) < 24 * 3600 * 1000;
+    $("cancelBox").classList.toggle("hidden", !within24h);
+  }
+  function renderPrint(r, e) {
+    ["printBtn", "pdfBtn", "dlReqBtn", "dlRespBtn"].forEach(function (id) { $(id).disabled = !e; $(id).title = e ? "" : "Available after the IRN is generated (step 4)"; });
+    $("step7").classList.toggle("done", !!e);
+    $("printHint").textContent = e ? "Prints the tax invoice with the IRN, acknowledgement and signed QR code. For a PDF, choose “Save as PDF” in the print dialog." : "Available after the IRN is generated.";
+  }
+
+  $("irnBtn").addEventListener("click", function () { if (currentKey) generate([currentKey], true); });
+  function generate(keys, showLog) {
+    if (!GstApi.token("einv")) return App.toast(GstApi.ready("einv") ? "Generate a token first (step 3)." : "Add API credentials and generate a token (step 3).", "bad");
+    var ok = [], bad = [];
+    keys.forEach(function (k) { var r = byKey(k), res = check(r); (res.errors.length ? bad : ok).push({ r: r, json: res.json }); });
+    if (!ok.length) return App.toast((bad.length > 1 ? "None of the " + bad.length + " invoices pass" : "This invoice doesn't pass") + " the IRP checks yet — see step 2.", "bad");
+    $("irnBtn").disabled = true;
+    var i = 0;
+    var log = function () { $("irpLog").innerHTML = IRP_STEPS.map(function (s, n) { return '<li class="' + (n < i ? "done" : n === i ? "now" : "") + '">' + s + (n < i ? " ✓" : "") + "</li>"; }).join(""); };
+    log();
+    var timer = setInterval(function () {
+      i++; log();
+      if (i < IRP_STEPS.length) return;
+      clearInterval(timer);
+      Promise.all(ok.map(function (x) { return EInvoice.irnFor(x.json); })).then(function (irns) {
+        ok.forEach(function (x, n) {
+          var now = new Date(), ackDt = now.toISOString().slice(0, 19).replace("T", " ");
+          var e = { irn: irns[n], ackNo: "11" + String(Date.now()).slice(-11) + String(n).padStart(2, "0"), ackDate: now.toISOString(), status: "Generated", json: x.json, signedQr: EInvoice.qrPayload(x.json, irns[n], ackDt), env: GstApi.config("einv").env };
+          if (x.r.kind === "voucher") Data.update("vouchers", x.r.rec.id, { einvoice: e }); else Data.update("einvDocs", x.r.rec.id, { einvoice: e });
+        });
+        App.toast("IRN generated for " + ok.length + " invoice" + (ok.length > 1 ? "s" : "") + (bad.length ? " · " + bad.length + " skipped (need fixes)" : "") + ".", bad.length ? "info" : "good");
+        if (keys.length === 1) currentKey = ok[0].r.key;
+        refreshAll(false);
+        if (showLog) { i = IRP_STEPS.length; log(); setTimeout(function () { flow.go(4, true); }, 600); }
+      });
+    }, 360);
+  }
+
+  $("cancelBtn").addEventListener("click", function () {
+    App.confirm({ title: "Cancel this IRN?", message: "This can't be undone, and the same document number can't get a new IRN.", ok: "Cancel IRN", danger: true }).then(function (ok) {
+      if (!ok) return;
+      var sel = $("cancelReason"), r = byKey(currentKey), e = r.einvoice;
+      e.status = "Cancelled"; e.cancelledAt = new Date().toISOString(); e.cancelReason = sel.options[sel.selectedIndex].text; e.cnlRsn = sel.value;
+      if (r.kind === "voucher") Data.update("vouchers", r.rec.id, { einvoice: e }); else Data.update("einvDocs", r.rec.id, { einvoice: e });
+      App.toast("IRN cancelled.", "info");
+      refreshAll(false);
+    });
+  });
+  $("qrPngBtn").addEventListener("click", function () {
+    var src = $("qrCanvas"), c = document.createElement("canvas"), s = 300; c.width = c.height = s + 40;
+    var g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height); g.imageSmoothingEnabled = false; g.drawImage(src, 20, 20, s, s);
+    var a = document.createElement("a"); a.href = c.toDataURL("image/png"); a.download = byKey(currentKey).number.replace(/[\/\\]/g, "-") + "_QR.png"; document.body.appendChild(a); a.click(); a.remove();
+  });
+  $("respCopyBtn").addEventListener("click", function () { copy($("respPre").textContent, "Response"); });
+  function dlResp() { var r = byKey(currentKey); App.downloadFile(r.number.replace(/[\/\\]/g, "-") + "_irp_response.json", JSON.stringify(responseOf(r, r.einvoice), null, 2), "application/json"); }
+  $("respDlBtn").addEventListener("click", dlResp);
+  $("dlRespBtn").addEventListener("click", dlResp);
+  $("dlReqBtn").addEventListener("click", function () { var r = byKey(currentKey); App.downloadFile(r.number.replace(/[\/\\]/g, "-") + "_einvoice.json", JSON.stringify([r.einvoice.json || jsonFor(r)], null, 2), "application/json"); });
+
+  // Printable invoice from the IRP JSON — works for Tally imports as well as invoices in the books.
+  function invoiceHtml(r, e) {
+    var j = e.json || jsonFor(r), s = j.SellerDtls, b = j.BuyerDtls, v = j.ValDtls, esc = App.esc, inr = App.inr;
+    var qr = $("qrCanvas").toDataURL();
+    return '<div style="font:12.5px/1.45 Arial,sans-serif;color:#111;max-width:780px;margin:0 auto">' +
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:20px;border-bottom:2px solid #111;padding-bottom:10px">' +
+        '<div><div style="font-size:20px;font-weight:700">' + esc(s.LglNm) + "</div>" + esc([s.Addr1, s.Addr2, s.Loc].filter(Boolean).join(", ")) + " - " + esc(s.Pin) + "<br>GSTIN: <b>" + esc(s.Gstin) + "</b> · State code " + esc(s.Stcd) + "</div>" +
+        '<div style="text-align:right"><div style="font-size:16px;font-weight:700">' + (j.DocDtls.Typ === "CRN" ? "CREDIT NOTE" : j.DocDtls.Typ === "DBN" ? "DEBIT NOTE" : "TAX INVOICE") + "</div>e-Invoice" + (e.status === "Cancelled" ? ' · <b style="color:#b91c1c">CANCELLED</b>' : "") + "</div></div>" +
+      '<div style="display:flex;justify-content:space-between;gap:16px;margin:12px 0;padding:10px;border:1px solid #bbb">' +
+        '<div style="font-size:11.5px"><b>IRN:</b> <span style="font-family:monospace">' + e.irn + "</span><br><b>Ack No:</b> " + e.ackNo + " &nbsp; <b>Ack Date:</b> " + App.dateTime(e.ackDate) + "<br><b>Invoice No:</b> " + esc(j.DocDtls.No) + " &nbsp; <b>Date:</b> " + esc(j.DocDtls.Dt) + " &nbsp; <b>Supply:</b> " + esc(j.TranDtls.SupTyp) + "</div>" +
+        '<img alt="Signed QR" src="' + qr + '" style="width:110px;height:110px;image-rendering:pixelated"></div>' +
+      '<div style="margin-bottom:12px"><b>Bill to:</b> ' + esc(b.LglNm) + "<br>" + esc([b.Addr1, b.Addr2, b.Loc].filter(Boolean).join(", ")) + (b.Pin ? " - " + esc(b.Pin) : "") + "<br>GSTIN: <b>" + esc(b.Gstin) + "</b> · Place of supply " + esc(b.Pos) + "</div>" +
+      '<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:#eee">' + ["#", "Description", "HSN", "Qty", "Unit", "Rate", "Taxable", "GST %", "Tax", "Total"].map(function (h, i) { return '<th style="border:1px solid #bbb;padding:5px;text-align:' + (i > 2 && i !== 4 ? "right" : "left") + '">' + h + "</th>"; }).join("") + "</tr></thead><tbody>" +
+      j.ItemList.map(function (it) { var tax = (it.IgstAmt || 0) + (it.CgstAmt || 0) + (it.SgstAmt || 0); return "<tr>" + [it.SlNo, esc(it.PrdDesc || ""), it.HsnCd, it.Qty == null ? "" : it.Qty, it.Unit || "", inr(it.UnitPrice), inr(it.AssAmt), it.GstRt, inr(tax), inr(it.TotItemVal)].map(function (c, i) { return '<td style="border:1px solid #bbb;padding:5px;text-align:' + (i > 2 && i !== 4 ? "right" : "left") + '">' + c + "</td>"; }).join("") + "</tr>"; }).join("") + "</tbody></table>" +
+      '<table style="margin:10px 0 0 auto;font-size:12.5px">' + [["Taxable value", v.AssVal], ["CGST", v.CgstVal || 0], ["SGST", v.SgstVal || 0], ["IGST", v.IgstVal || 0], ["Round off", v.RndOffAmt || 0]].map(function (x) { return '<tr><td style="padding:2px 12px">' + x[0] + '</td><td style="text-align:right">' + inr(x[1]) + "</td></tr>"; }).join("") +
+      '<tr><td style="padding:4px 12px;font-weight:700;border-top:1px solid #111">Total</td><td style="text-align:right;font-weight:700;border-top:1px solid #111">' + inr(v.TotInvVal) + "</td></tr></table>" +
+      '<p style="margin-top:18px;font-size:11px;color:#555">' + App.amountInWords(v.TotInvVal) + ". This is a computer-generated e-invoice registered on the IRP" + (e.env === "production" ? "" : " (sandbox, simulated)") + ".</p></div>";
+  }
+  function printDoc() { var r = byKey(currentKey); Items.print(invoiceHtml(r, r.einvoice)); }
+  $("printBtn").addEventListener("click", printDoc);
+  $("pdfBtn").addEventListener("click", function () { App.toast("Choose “Save as PDF” in the print dialog.", "info"); printDoc(); });
+
+  /* =====================================================
+     Register
+     ===================================================== */
+  function renderStats() {
+    var c = { Pending: 0, Generated: 0, Cancelled: 0, NA: 0 }, ready = 0;
+    rows().forEach(function (r) { var s = statusOf(r); c[s]++; if (s === "Pending" && !check(r).errors.length) ready++; });
+    var items = [
+      { label: "Pending IRN", value: c.Pending, sub: ready + " ready · " + (c.Pending - ready) + " need fixes", tone: "warn" },
+      { label: "IRN Generated", value: c.Generated, sub: "Registered on IRP", tone: "good" },
+      { label: "Cancelled", value: c.Cancelled, sub: "Within 24h", tone: "bad" },
+      { label: "B2C / Exempt", value: c.NA, sub: "No buyer GSTIN — no IRN", tone: "info" }
+    ];
+    $("statGrid").innerHTML = items.map(function (x) { return '<div class="stat-card" style="--tint:var(--' + x.tone + ')"><div class="stat-top"><span class="stat-label">' + x.label + '</span></div><div class="stat-value">' + x.value + '</div><div class="stat-sub">' + x.sub + "</div></div>"; }).join("");
+  }
+  var BADGE = { Generated: '<span class="badge badge-good">Generated</span>', Cancelled: '<span class="badge badge-bad">Cancelled</span>', NA: '<span class="badge badge-muted">Not applicable</span>' };
   function render() {
     var q = $("search").value.trim().toLowerCase();
-    var rows = sales().filter(function (v) { return statusOf(v) === status && (!q || (v.number + v.party).toLowerCase().indexOf(q) !== -1); })
-      .sort(function (a, b) { return b.date.localeCompare(a.date); });
-    $("checkAll").checked = false;
-    $("checkAll").disabled = status !== "Pending";
-    var rowsPage = listPg.slice(rows);
-    $("body").innerHTML = rowsPage.length ? rowsPage.map(function (v) {
-      var st = statusOf(v);
-      return "<tr><td>" + (st === "Pending" ? '<input type="checkbox" data-perm="create" class="row-check" value="' + v.id + '">' : "") + '</td><td class="mono cell-strong">' + v.number + "</td><td>" + App.date(v.date) + "</td>" +
-        "<td><span class='cell-strong'>" + App.esc(v.party) + "</span><span class='cell-sub'>" + App.esc(v.partyState || "") + "</span></td>" +
-        '<td class="mono" style="font-size:12px">' + (v.partyGstin || "—") + '</td><td class="num cell-strong">' + App.inr(v.total) + "</td><td>" + BADGE[st] +
-        (v.einvoice && v.einvoice.ackNo ? "<span class='cell-sub mono'>Ack " + v.einvoice.ackNo + "</span>" : "") + "</td>" +
-        '<td><div class="row-actions">' + (st === "Pending" ? '<button class="btn btn-accent btn-xs" data-perm="create" data-gen="' + v.id + '">' + App.icon("zap") + "Generate</button>" : "") +
-        (st === "Generated" || st === "Cancelled" ? '<button class="btn btn-ghost btn-xs" data-view="' + v.id + '">' + App.icon("eye") + "View</button>" : "") + "</div></td></tr>";
+    var list = rows().filter(function (r) { return statusOf(r) === status && (!q || (r.number + r.party).toLowerCase().indexOf(q) !== -1); })
+      .sort(function (a, b) { return b.date.localeCompare(a.date) || b.number.localeCompare(a.number); });
+    $("checkAll").checked = false; $("checkAll").disabled = status !== "Pending";
+    var page = listPg.slice(list);
+    $("body").innerHTML = page.length ? page.map(function (r) {
+      var st = statusOf(r), errs = st === "Pending" ? check(r).errors : [];
+      var badge = st === "Pending" ? (errs.length ? '<span class="badge badge-bad">' + errs.length + " issue" + (errs.length > 1 ? "s" : "") + "</span>" : '<span class="badge badge-good plain">Ready</span>') : BADGE[st];
+      return "<tr" + (r.key === currentKey ? ' class="row-current"' : "") + "><td>" + (st === "Pending" ? '<input type="checkbox" data-perm="create" class="row-check" value="' + r.key + '" aria-label="Select ' + App.esc(r.number) + '">' : "") + "</td>" +
+        '<td class="mono cell-strong">' + App.esc(r.number) + (r.kind === "file" ? ' <span class="badge badge-info plain" style="font-size:10px;font-family:var(--font)">' + App.esc(r.source) + "</span>" : "") + "</td><td>" + App.date(r.date) + "</td>" +
+        "<td><span class='cell-strong'>" + App.esc(r.party) + "</span><span class='cell-sub'>" + App.esc(r.state || "") + "</span></td>" +
+        '<td class="mono" style="font-size:12px">' + (r.gstin || "—") + '</td><td class="num cell-strong">' + App.inr(r.total) + "</td><td>" + badge +
+        (r.einvoice && r.einvoice.ackNo ? "<span class='cell-sub mono'>Ack " + r.einvoice.ackNo + "</span>" : "") + "</td>" +
+        '<td><div class="row-actions">' + (st !== "NA" ? '<button class="btn btn-ghost btn-xs" data-open="' + r.key + '">' + App.icon("arrowRight") + "Open</button>" : "") + "</div></td></tr>";
     }).join("") : App.emptyRow(8, "Nothing here", status === "Pending" ? "All B2B invoices have an IRN. Nice work!" : "No invoices in this status.");
     syncBulk();
   }
-
-  function pendingIds() { return sales().filter(function (v) { return statusOf(v) === "Pending"; }).map(function (v) { return v.id; }); }
-
-  // With rows ticked the button works on those; otherwise it offers all pending B2B invoices.
+  function pendingKeys() { return rows().filter(function (r) { return statusOf(r) === "Pending"; }).map(function (r) { return r.key; }); }
+  function ticked() { return Array.prototype.map.call(document.querySelectorAll(".row-check:checked"), function (c) { return c.value; }); }
   function syncBulk() {
-    var n = document.querySelectorAll(".row-check:checked").length, all = pendingIds().length;
-    var btn = $("bulkBtn");
-    btn.disabled = !n && !all;
-    btn.title = !n && !all ? "Every B2B invoice already has an IRN" : n ? "" : "Tick invoices below to generate only those";
+    var n = ticked().length, all = pendingKeys().length, btn = $("bulkBtn"), tk = !!GstApi.token("einv");
+    btn.disabled = (!n && !all) || !tk;
+    btn.title = !tk ? "Generate a token first (step 3)" : !n && !all ? "Every B2B invoice already has an IRN" : n ? "" : "Tick invoices to generate only those";
     btn.lastChild.textContent = n ? "Generate IRN for " + n + " selected" : all ? "Generate IRN for all pending (" + all + ")" : "All IRNs generated";
+    $("jsonAllBtn").disabled = !n && !all;
+    $("jsonAllBtn").title = !n && !all ? "No pending invoices to export" : "JSON for the IRP bulk upload";
   }
-
   $("statusTabs").addEventListener("click", function (e) {
-    var b = e.target.closest("button");
-    if (!b) return;
+    var b = e.target.closest("button"); if (!b) return;
     status = b.dataset.s;
     $("statusTabs").querySelectorAll("button").forEach(function (x) { x.classList.toggle("active", x === b); });
     render();
   });
   $("search").addEventListener("input", render);
-  $("checkAll").addEventListener("change", function () {
-    var on = this.checked;
-    document.querySelectorAll(".row-check").forEach(function (c) { c.checked = on; });
-    syncBulk();
-  });
+  $("checkAll").addEventListener("change", function () { var on = this.checked; document.querySelectorAll(".row-check").forEach(function (c) { c.checked = on; }); syncBulk(); });
   $("body").addEventListener("change", function (e) { if (e.target.classList.contains("row-check")) syncBulk(); });
-  $("body").addEventListener("click", function (e) {
-    var b = e.target.closest("button");
-    if (!b) return;
-    if (b.dataset.gen) generate([b.dataset.gen]);
-    if (b.dataset.view) openView(b.dataset.view);
-  });
+  $("body").addEventListener("click", function (e) { var b = e.target.closest("[data-open]"); if (b) openInFlow(b.dataset.open); });
   $("bulkBtn").addEventListener("click", function () {
-    var ticked = Array.prototype.map.call(document.querySelectorAll(".row-check:checked"), function (c) { return c.value; });
-    if (ticked.length) { generate(ticked); return; }
-    var all = pendingIds();
-    if (!all.length) return;
-    App.confirm({ title: "Generate IRN for all pending invoices?", message: all.length + " B2B invoice" + (all.length > 1 ? "s" : "") + " will be registered on the Invoice Registration Portal.", detail: "To pick specific invoices, cancel and tick them in the Pending list.", ok: "Generate " + all.length })
-      .then(function (ok) { if (ok) generate(all); });
+    var t = ticked();
+    if (t.length) { generate(t, false); return; }
+    var all = pendingKeys(); if (!all.length) return;
+    App.confirm({ title: "Generate IRN for all pending invoices?", message: all.length + " B2B invoice" + (all.length > 1 ? "s" : "") + " will be checked and sent to the IRP.", detail: "Invoices that don't pass the checks are skipped.", ok: "Generate " + all.length })
+      .then(function (ok) { if (ok) generate(all, false); });
+  });
+  // Bulk JSON: an array of invoices, the IRP's bulk-upload format.
+  $("jsonAllBtn").addEventListener("click", function () {
+    var t = ticked(), keys = t.length ? t : pendingKeys(), good = [], skipped = 0;
+    keys.forEach(function (k) { var res = check(byKey(k)); if (res.errors.length) skipped++; else good.push(res.json); });
+    if (!good.length) return App.toast("None of these invoices pass the checks yet — open one to see what to fix.", "bad");
+    App.downloadFile("eInvoice_" + (tenant.gstin || tenant.tenantId) + "_" + App.today() + ".json", JSON.stringify(good, null, 2), "application/json");
+    App.toast(good.length + " invoice" + (good.length > 1 ? "s" : "") + " in the JSON file" + (skipped ? " · " + skipped + " left out (need fixes)" : "") + ".", skipped ? "info" : "good");
   });
 
-  /* Simulated IRP round-trip: validate → sign → register. */
-  function generate(ids) {
-    var steps = ["Validating invoice schema", "Authenticating GSTIN " + (tenant.gstin || "(demo)"), "Signing payload", "Registering IRN"];
-    var i = 0;
-    $("progressText").textContent = steps[0];
-    App.openModal("progressModal");
-    var timer = setInterval(function () {
-      i++;
-      if (i < steps.length) { $("progressText").textContent = steps[i]; return; }
-      clearInterval(timer);
-      var vs = Data.list("vouchers");
-      vs.forEach(function (v) {
-        if (ids.indexOf(v.id) === -1) return;
-        v.einvoice = {
-          irn: Data.fakeHash(v.number + "|" + v.total + "|" + Date.now()),
-          ackNo: "11" + String(Date.now()).slice(-10) + String(Math.floor(Math.random() * 90 + 10)),
-          ackDate: new Date().toISOString(),
-          status: "Generated"
-        };
-      });
-      Data.save("vouchers", vs);
-      App.closeModal("progressModal");
-      App.toast("IRN generated for " + ids.length + " invoice" + (ids.length > 1 ? "s" : "") + ".");
-      renderStats(); render();
-      if (ids.length === 1) openView(ids[0]);
-    }, 450);
+  function refreshFlow(stale) { fillPick(); renderDetails(); renderJson(stale); renderIrn(); renderWorking(); if (flow) flow.refresh(); }
+  function refreshAll(stale) { renderImport(); refreshFlow(stale); renderStats(); render(); }
+  /* ---------------- Step flow ---------------- */
+  function cur() { return currentKey && byKey(currentKey); }
+  function mappedOk() { var r = cur(); return !!r && (!!r.einvoice || !check(r).errors.length); }
+  function hasIrn() { var r = cur(); return !!(r && r.einvoice); }
+  function renderWorking() {
+    var r = cur(), st = r ? statusOf(r) : null;
+    $("workBadge").innerHTML = !r ? '<span class="badge badge-muted">Pick an invoice in step 1</span>' :
+      st === "Generated" ? '<span class="badge badge-good">IRN generated</span>' : st === "Cancelled" ? '<span class="badge badge-bad">IRN cancelled</span>' :
+      check(r).errors.length ? '<span class="badge badge-bad">' + check(r).errors.length + " issue" + (check(r).errors.length > 1 ? "s" : "") + " to fix</span>" : '<span class="badge badge-good plain">Ready for IRN</span>';
   }
-
-  function openView(id) {
-    var v = Data.get("vouchers", id), e = v.einvoice;
-    viewingId = id;
-    $("viewTitle").textContent = "e-Invoice · " + v.number;
-    App.drawQr($("qrCanvas"), e.irn);
-    $("irnDetails").innerHTML =
-      "<dt>Status</dt><dd>" + BADGE[e.status] + "</dd>" +
-      '<dt>IRN</dt><dd class="mono" style="font-size:11.5px">' + e.irn + "</dd>" +
-      '<dt>Ack No.</dt><dd class="mono">' + e.ackNo + "</dd>" +
-      "<dt>Ack Date</dt><dd>" + App.dateTime(e.ackDate) + "</dd>" +
-      "<dt>Buyer</dt><dd>" + App.esc(v.party) + ' · <span class="mono">' + App.esc(v.partyGstin) + "</span></dd>" +
-      "<dt>Invoice value</dt><dd>" + App.inr(v.total) + "</dd>" +
-      (e.status === "Cancelled" ? "<dt>Cancelled</dt><dd>" + App.dateTime(e.cancelledAt) + " · " + App.esc(e.cancelReason) + "</dd>" : "");
-    var within24h = e.status === "Generated" && (Date.now() - new Date(e.ackDate).getTime()) < 24 * 3600 * 1000;
-    $("cancelBox").style.display = within24h ? "" : "none";
-    App.openModal("viewModal");
+  function fillBookPick() {
+    var list = rows().filter(function (r) { return r.kind === "voucher" && statusOf(r) === "Pending"; }).sort(function (a, b) { return b.date.localeCompare(a.date); });
+    $("bookPick").innerHTML = list.length ? list.map(function (r) { return '<option value="' + r.key + '">' + App.esc(r.number) + " · " + App.esc(r.party) + " · " + App.inr0(r.total) + "</option>"; }).join("") : "<option value=''>No pending B2B invoices in your books</option>";
+    $("bookUse").disabled = !list.length;
   }
-
-  $("cancelBtn").addEventListener("click", function () {
-    App.confirm({ title: "Cancel this IRN?", message: "This can't be undone.", ok: "Cancel IRN", danger: true }).then(function (ok) {
-      if (!ok) return;
-      var sel = $("cancelReason");
-      var v = Data.get("vouchers", viewingId);
-      v.einvoice.status = "Cancelled";
-      v.einvoice.cancelledAt = new Date().toISOString();
-      v.einvoice.cancelReason = sel.options[sel.selectedIndex].text;
-      Data.update("vouchers", viewingId, { einvoice: v.einvoice });
-      App.toast("IRN cancelled.", "info");
-      openView(viewingId); renderStats(); render();
-    });
+  $("bookUse").addEventListener("click", function () { var k = $("bookPick").value; if (!k) return; select(k); render(); flow.go(1, true); App.toast(byKey(k).number + " selected."); });
+  $("nextInvBtn").addEventListener("click", function () {
+    var next = rows().filter(function (r) { return statusOf(r) === "Pending"; }).sort(function (a, b) { return b.date.localeCompare(a.date); })[0];
+    if (!next) return App.toast("No pending invoices left — every B2B invoice has an IRN.", "info");
+    select(next.key); render(); flow.go(1, true); App.toast("Now working on " + next.number + ".");
   });
-
-  $("printBtn").addEventListener("click", function () { Items.print(Items.preview(Data.get("vouchers", viewingId), tenant, "TAX INVOICE")); });
-
-  // Shape loosely follows the GST e-invoice schema (INV-01) — enough to show what gets sent.
-  $("jsonBtn").addEventListener("click", function () {
-    var v = Data.get("vouchers", viewingId);
-    var json = {
-      Version: "1.1",
-      TranDtls: { TaxSch: "GST", SupTyp: "B2B" },
-      DocDtls: { Typ: "INV", No: v.number, Dt: v.date.split("-").reverse().join("/") },
-      SellerDtls: { Gstin: tenant.gstin, LglNm: tenant.companyName, Stcd: tenant.state },
-      BuyerDtls: { Gstin: v.partyGstin, LglNm: v.party, Pos: v.partyState },
-      ItemList: v.items.map(function (it, i) {
-        return { SlNo: String(i + 1), PrdDesc: it.name, HsnCd: it.hsn, Qty: it.qty, Unit: it.unit, UnitPrice: it.rate, AssAmt: it.qty * it.rate, GstRt: it.gst };
-      }),
-      ValDtls: { AssVal: v.subtotal, CgstVal: v.cgst, SgstVal: v.sgst, IgstVal: v.igst, TotInvVal: v.total },
-      Irn: v.einvoice.irn, AckNo: v.einvoice.ackNo, AckDt: v.einvoice.ackDate
-    };
-    App.downloadFile(v.number.replace(/\//g, "-") + "_einvoice.json", JSON.stringify(json, null, 2), "application/json");
+  var flow = null;
+  flow = FlowUI.init({
+    bar: $("flowbarSteps"),
+    steps: [
+      { id: "step1", label: "Import", state: function () { return cur() ? "done" : "ready"; },
+        summary: function () { var r = cur(); return r ? r.number + " · " + r.party + " · from " + (r.kind === "voucher" ? "your books" : r.source) : ""; }, nextHint: function () { return "Upload a file or pick an invoice."; } },
+      { id: "step2", label: "JSON mapping", state: function () { return !cur() ? "locked" : mappedOk() ? "done" : "ready"; },
+        summary: function () { var r = cur(); if (!r) return ""; var n = r.einvoice ? 0 : check(r).errors.length; return n ? n + " issue" + (n > 1 ? "s" : "") + " to fix" : "JSON ready · schema v1.1"; },
+        nextHint: function () { return "Fix the issues listed above to continue."; } },
+      { id: "step3", label: "Token", state: function () { return GstApi.token("einv") || hasIrn() ? "done" : !mappedOk() ? "locked" : "ready"; },
+        summary: function () { var t = GstApi.token("einv"); return t ? "Token valid until " + App.dateTime(t.expiresAt) : hasIrn() ? "Not needed — IRN already generated" : "No token yet"; },
+        nextHint: function () { return "Generate the token to continue."; } },
+      { id: "step4", label: "IRN", state: function () { return hasIrn() ? "done" : mappedOk() && GstApi.token("einv") ? "ready" : "locked"; },
+        summary: function () { var r = cur(); return r && r.einvoice ? (r.einvoice.status === "Cancelled" ? "IRN cancelled" : "IRN " + r.einvoice.irn.slice(0, 12) + "…") : "Ready to generate"; },
+        nextHint: function () { return "Generate the IRN to continue."; } },
+      { id: "step5", label: "QR code", state: function () { return hasIrn() ? "done" : "locked"; }, summary: function () { return hasIrn() ? "Signed QR ready" : ""; } },
+      { id: "step6", label: "Response", state: function () { return hasIrn() ? "done" : "locked"; }, summary: function () { var r = cur(); return r && r.einvoice ? "Ack " + r.einvoice.ackNo + " · " + (r.einvoice.status === "Cancelled" ? "CNL" : "ACT") : ""; } },
+      { id: "step7", label: "Print / Download", state: function () { return hasIrn() ? "done" : "locked"; }, summary: function () { return hasIrn() ? "Print, PDF and JSON" : ""; } }
+    ]
   });
+  var _refreshAll = refreshAll;
+  refreshAll = function (stale) { _refreshAll(stale); fillBookPick(); };
 
-  renderStats(); render();
+  renderSellerAlert(); refreshAll(true); syncToken(); flow.resume();
 </script>
 </body>
 </html>

@@ -177,6 +177,108 @@ var Tally = (function () {
     });
   }
 
+  /* ---------------- Groups (shared by every company in this tenant) ----------------
+     Tally rules: names are unique across groups and ledgers; a group sits under Primary or another
+     group (never under itself or its own sub-groups); a primary group needs a nature, a sub-group
+     takes its parent's; predefined groups can't be altered or deleted; a group with ledgers or
+     sub-groups can't be deleted. */
+  var NATURES = ["Assets", "Liabilities", "Income", "Expenses"];
+  function groups() { return Data.list("groups"); }
+  function groupByName(name) {
+    var n = String(name || "").trim().toLowerCase();
+    return groups().filter(function (g) { return g.name.toLowerCase() === n; })[0] || null;
+  }
+  function natureOf(name) {
+    var g = groupByName(name), guard = 0;
+    while (g && g.parent && guard++ < 50) g = groupByName(g.parent);
+    return g ? g.nature || "" : "";
+  }
+  // Every ledger name in every company (group and ledger names share one namespace in Tally).
+  function allLedgerNames() {
+    return Data.list("ledgers").map(function (l) { return l.name; }).concat(Data.list("extLedgers").map(function (l) { return l.name; }));
+  }
+  function ledgersInGroup(name) {
+    return Data.list("ledgers").filter(function (l) { return l.group === name; }).length + Data.list("extLedgers").filter(function (l) { return l.parent === name; }).length;
+  }
+  function validateGroupInput(input, existingName) {
+    var name = String(input.name || "").trim(), parent = String(input.parent || "").trim() || "Primary";
+    if (!name) return "Group name is required.";
+    if (name.length > 100) return "Group name can be at most 100 characters.";
+    if (/^primary$/i.test(name)) return "“Primary” is reserved in Tally.";
+    var clash = groupByName(name);
+    if (clash && clash.name !== existingName) return "A group named “" + clash.name + "” already exists in Tally.";
+    if (allLedgerNames().some(function (n) { return n.toLowerCase() === name.toLowerCase(); })) return "A ledger is already named “" + name + "”. Groups and ledgers need different names.";
+    if (parent !== "Primary") {
+      if (!groupByName(parent)) return "Group “" + parent + "” does not exist in Tally.";
+      if (existingName && App.groupsUnder(existingName).map(function (n) { return n.toLowerCase(); }).indexOf(parent.toLowerCase()) !== -1)
+        return "A group can't be placed under itself or one of its own sub-groups.";
+    } else if (NATURES.indexOf(input.nature) === -1) return "Choose the nature of a primary group (Assets, Liabilities, Income or Expenses).";
+    return null;
+  }
+  function groupPayload(g, extra) {
+    return Object.assign({ name: g.name, parent: g.parent || "Primary", nature: g.parent && g.parent !== "Primary" ? undefined : g.nature }, extra || {});
+  }
+  function failGroup(title, req, msg) { record(title, "Groups", req, importResult(0, 0, [msg])); throw new Error(msg); }
+
+  function createGroup(input) {
+    var parent = String(input.parent || "").trim() || "Primary";
+    var req = { tallyrequest: "Import", type: "Data", id: "All Masters", group: groupPayload({ name: String(input.name || "").trim(), parent: parent, nature: input.nature }) };
+    return delay(450).then(function () {
+      if (!reachable()) { var e0 = offlineError(); record("Create group", "Groups", req, { status: "0", error: e0.message }); throw e0; }
+      var err = validateGroupInput(input);
+      if (err) failGroup("Create group", req, err);
+      var name = input.name.trim(), p = parent === "Primary" ? null : groupByName(parent).name;
+      var g = Data.add("groups", { name: name, parent: p, nature: p ? natureOf(p) : input.nature, predefined: false, createdAt: now() });
+      record("Create group", "Groups · " + name, req, importResult(1, 0, []));
+      return g;
+    });
+  }
+
+  function alterGroup(oldName, input) {
+    var parent = String(input.parent || "").trim() || "Primary";
+    var req = { tallyrequest: "Import", type: "Data", id: "All Masters", group: groupPayload({ name: oldName, parent: parent, nature: input.nature }, { newname: String(input.name || "").trim(), action: "Alter" }) };
+    return delay(450).then(function () {
+      if (!reachable()) { var e0 = offlineError(); record("Alter group", "Groups", req, { status: "0", error: e0.message }); throw e0; }
+      var g = groupByName(oldName);
+      if (!g) failGroup("Alter group", req, "Group “" + oldName + "” no longer exists in Tally.");
+      if (g.predefined) failGroup("Alter group", req, "“" + g.name + "” is a predefined Tally group and can't be altered.");
+      var err = validateGroupInput(input, g.name);
+      if (err) failGroup("Alter group", req, err);
+      var name = input.name.trim(), p = parent === "Primary" ? null : groupByName(parent).name;
+      // Rename everywhere the group is referenced, then re-derive the nature for the whole branch.
+      var gs = groups();
+      gs.forEach(function (x) {
+        if (x.id === g.id) { x.name = name; x.parent = p; x.nature = p ? natureOf(p) : input.nature; }
+        else if (x.parent === g.name) x.parent = name;
+      });
+      Data.save("groups", gs);
+      if (name !== g.name) {
+        var ls = Data.list("ledgers"); ls.forEach(function (l) { if (l.group === g.name) l.group = name; }); Data.save("ledgers", ls);
+        var ex = Data.list("extLedgers"); ex.forEach(function (l) { if (l.parent === g.name) l.parent = name; }); Data.save("extLedgers", ex);
+        var cache = Data.list("ledgerCache"); cache.forEach(function (c) { c.ledgers.forEach(function (l) { if (l.parent === g.name) l.parent = name; }); }); Data.save("ledgerCache", cache);
+      }
+      var branch = App.groupsUnder(name), nat = natureOf(name);
+      gs = groups(); gs.forEach(function (x) { if (branch.indexOf(x.name) !== -1) x.nature = nat; }); Data.save("groups", gs);
+      record("Alter group", "Groups · " + name, req, importResult(0, 1, []));
+      return groupByName(name);
+    });
+  }
+
+  function deleteGroup(name) {
+    var req = { tallyrequest: "Import", type: "Data", id: "All Masters", group: { name: name, action: "Delete" } };
+    return delay(400).then(function () {
+      if (!reachable()) { var e0 = offlineError(); record("Delete group", "Groups", req, { status: "0", error: e0.message }); throw e0; }
+      var g = groupByName(name);
+      if (!g) failGroup("Delete group", req, "Group “" + name + "” no longer exists in Tally.");
+      if (g.predefined) failGroup("Delete group", req, "“" + g.name + "” is a predefined Tally group and can't be deleted.");
+      var subs = groups().filter(function (x) { return x.parent === g.name; }).length, n = ledgersInGroup(g.name);
+      if (subs || n) failGroup("Delete group", req, "“" + g.name + "” has " + [n ? n + " ledger" + (n > 1 ? "s" : "") : "", subs ? subs + " sub-group" + (subs > 1 ? "s" : "") : ""].filter(Boolean).join(" and ") + ". Move or delete them first.");
+      Data.remove("groups", g.id);
+      record("Delete group", "Groups · " + g.name, req, { status: "1", deleted: 1 });
+      return true;
+    });
+  }
+
   /* ---------------- Pushing bank entries as vouchers ---------------- */
   // Re-checks every entry against the live books, so a ledger deleted after validation fails cleanly.
   function push(company, bank, entries, onProgress) {
@@ -415,6 +517,7 @@ var Tally = (function () {
     settings: settings, saveSettings: saveSettings, format: format, address: address, reachable: reachable, status: status,
     companies: companies, isPrimary: isPrimary, liveLedgers: liveLedgers, groupsOf: groupsOf, groupUnder: groupUnder, isCashOrBankGroup: isCashOrBankGroup,
     cached: cached, fetchLedgers: fetchLedgers, createLedger: createLedger, alterLedger: alterLedger, deleteLedger: deleteLedger,
+    NATURES: NATURES, groups: groups, groupByName: groupByName, natureOf: natureOf, ledgersInGroup: ledgersInGroup, createGroup: createGroup, alterGroup: alterGroup, deleteGroup: deleteGroup,
     push: push, raw: raw, sampleRequest: sampleRequest, lastResponse: lastResponse, suggestBank: suggestBank,
     ensureSeed: ensureSeed, importStats: importStats
   };

@@ -35,7 +35,7 @@ var Data = (function () {
   /* ---------------- Tenants ---------------- */
 
   var SEED_TENANTS = [
-    { tenantId: "TALLY01", username: "admin", email: "accounts@sriramtraders.in", password: "Admin@123", companyName: "Sri Ram Traders Pvt Ltd", gstin: "33ABCDE1234F1Z5", state: "Tamil Nadu", contactNumber: "9876543210", businessType: "Trading", fyStart: "2026-04-01", status: "Active", createdAt: "2026-04-01T09:00:00.000Z" },
+    { tenantId: "TALLY01", username: "admin", email: "accounts@sriramtraders.in", password: "Admin@123", companyName: "Sri Ram Traders Pvt Ltd", gstin: "33ABCDE1234F1Z5", state: "Tamil Nadu", contactNumber: "9876543210", businessType: "Trading", fyStart: "2026-04-01", status: "Active", addr1: "No. 8, Anna Salai", addr2: "Teynampet", location: "Chennai", pin: "600018", createdAt: "2026-04-01T09:00:00.000Z" },
     { tenantId: "TALLY02", username: "kaveri", email: "finance@kaveriretail.in", password: "Kaveri@123", companyName: "Kaveri Retail LLP", gstin: "29KLMNO5678P1Z2", state: "Karnataka", contactNumber: "9845012345", businessType: "Retail", fyStart: "2026-04-01", status: "Pending", createdAt: "2026-10-04T11:30:00.000Z" }
   ];
 
@@ -120,8 +120,8 @@ var Data = (function () {
   var MODULES = [
     { key: "dashboard", label: "Dashboard", group: "Overview", actions: ["view"] },
     { key: "statement", label: "Import Statement", group: "Masters & Documents", actions: ["view", "create", "edit", "delete"], note: "Create = upload & push · Edit = map, validate · Delete = remove an import" },
-    { key: "invoice", label: "Invoice / Quotation", group: "Masters & Documents", actions: ["view", "create", "delete"] },
     { key: "ledger", label: "Ledgers", group: "Masters & Documents", actions: ["view", "create", "edit", "delete"], note: "Changes are written to Tally Prime" },
+    { key: "invoice", label: "Invoice / Quotation", group: "Transactions", actions: ["view", "create", "delete"] },
     { key: "salespurchase", label: "Sales & Purchase", group: "Transactions", actions: ["view", "create", "delete"] },
     { key: "paymentreceipt", label: "Payment & Receipt", group: "Transactions", actions: ["view", "create", "delete"] },
     { key: "contrajournal", label: "Contra & Journal", group: "Transactions", actions: ["view", "create", "delete"] },

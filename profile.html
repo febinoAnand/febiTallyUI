@@ -137,6 +137,24 @@
                   <input type="text" id="cContact" maxlength="10">
                   <span class="err-msg" id="errCContact">Enter a valid 10-digit number.</span>
                 </div>
+                <div class="field full">
+                  <label for="cAddr1">Address line 1</label>
+                  <input type="text" id="cAddr1" maxlength="100" placeholder="Door no., street">
+                  <span class="err-msg" id="errCAddr1">Use 3–100 characters, without " or \.</span>
+                </div>
+                <div class="field full">
+                  <label for="cAddr2">Address line 2</label>
+                  <input type="text" id="cAddr2" maxlength="100" placeholder="Area (optional)">
+                </div>
+                <div class="field">
+                  <label for="cLoc">City / Location</label>
+                  <input type="text" id="cLoc" maxlength="50">
+                </div>
+                <div class="field">
+                  <label for="cPin">PIN Code</label>
+                  <input type="text" id="cPin" maxlength="6" inputmode="numeric" class="mono">
+                  <span class="err-msg" id="errCPin">Enter the 6-digit PIN of your state.</span>
+                </div>
                 <div class="field">
                   <label for="cType">Business Type</label>
                   <select id="cType"><option>Trading</option><option>Retail</option><option>Manufacturing</option><option>Services</option><option>E-Commerce Seller</option></select>
@@ -297,10 +315,11 @@
     $("cName").value = t.companyName; $("cId").value = t.tenantId; $("cGstin").value = t.gstin || "";
     $("cState").value = t.state; $("cContact").value = t.contactNumber || ""; $("cType").value = t.businessType || "Trading";
     $("cFy").value = t.fyStart;
+    $("cAddr1").value = t.addr1 || ""; $("cAddr2").value = t.addr2 || ""; $("cLoc").value = t.location || ""; $("cPin").value = t.pin || "";
   }
   fillCompany();
   if (!isAdmin) {
-    ["cName", "cGstin", "cState", "cContact", "cType"].forEach(function (id) { $(id).disabled = true; });
+    ["cName", "cGstin", "cState", "cContact", "cType", "cAddr1", "cAddr2", "cLoc", "cPin"].forEach(function (id) { $(id).disabled = true; });
     $("companyFoot").style.display = "none";
     $("companySub").textContent = "Only administrators can change company details";
   } else {
@@ -313,10 +332,13 @@
     var ok = [
       setErr("cName", "errCName", !$("cName").value.trim()),
       setErr("cGstin", "errCGstin", gstin !== "" && !/^\d{2}[A-Z]{5}\d{4}[A-Z][A-Z\d]Z[A-Z\d]$/.test(gstin)),
-      setErr("cContact", "errCContact", contact !== "" && !/^[6-9]\d{9}$/.test(contact))
+      setErr("cContact", "errCContact", contact !== "" && !/^[6-9]\d{9}$/.test(contact)),
+      setErr("cAddr1", "errCAddr1", $("cAddr1").value.trim() !== "" && !/^[^"\\]{3,100}$/.test($("cAddr1").value.trim())),
+      setErr("cPin", "errCPin", $("cPin").value.trim() !== "" && !/^[1-9]\d{5}$/.test($("cPin").value.trim()))
     ].every(Boolean);
     if (!ok) return;
-    Data.updateTenant(tenant.tenantId, { companyName: $("cName").value.trim(), gstin: gstin, state: $("cState").value, contactNumber: contact, businessType: $("cType").value });
+    Data.updateTenant(tenant.tenantId, { companyName: $("cName").value.trim(), gstin: gstin, state: $("cState").value, contactNumber: contact, businessType: $("cType").value,
+      addr1: $("cAddr1").value.trim(), addr2: $("cAddr2").value.trim(), location: $("cLoc").value.trim(), pin: $("cPin").value.trim() });
     App.toast("Company details saved.");
     setTimeout(function () { location.reload(); }, 700);
   });
