@@ -79,7 +79,7 @@ var App = (function () {
     { key: "einvoice", label: "e-Invoice", href: "e-invoice.html", icon: "einvoice" },
     { key: "ewaybill", label: "e-Way Bill", href: "e-way-bill.html", icon: "ewaybill" },
     { section: "Integrations" },
-    { key: "ecommerce", label: "e-Commerce Import", href: "ecommerce-import.html", icon: "ecommerce" },
+    { key: "ecommerce", label: "e-Commerce GST Report", href: "ecommerce-import.html", icon: "ecommerce" },
     { section: "Administration" },
     { key: "settings", label: "Settings", href: "settings.html", icon: "settings" },
     { key: "users", label: "Users", href: "users.html", icon: "users" },
