@@ -242,7 +242,7 @@
     $("repTabs").querySelectorAll("button").forEach(function (b) { b.classList.toggle("active", b.dataset.t === tab); });
     $("tabHelp").textContent = HELP[tab];
     $("tabTop").classList.add("hidden"); $("tabBottom").classList.add("hidden"); $("tabTop").innerHTML = ""; $("tabBottom").innerHTML = "";
-    if (!model) { $("repTable").innerHTML = thead([{ h: "Report" }]) + "<tbody>" + App.emptyRow(1, "Nothing to show yet", "Import the month's reports in step 1.") + "</tbody>"; return; }
+    if (!model) { $("repTable").innerHTML = thead([{ h: "" }]) + "<tbody>" + App.emptyRow(1, "Nothing to show yet", "Import the month's reports in step 1.") + "</tbody>"; return; }
     var cols, rows = "", foot = "";
     if (tab === "b2b") {
       cols = [{ h: "Invoice No." }, { h: "Customer" }, { h: "GSTIN" }, { h: "Date" }, { h: "Invoice value", n: 1 }, { h: "Rate", n: 1 }, { h: "Taxable", n: 1 }, { h: "IGST", n: 1 }, { h: "CGST", n: 1 }, { h: "SGST", n: 1 }, { h: "State of supply" }, { h: "Platform" }];

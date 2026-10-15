@@ -1352,3 +1352,8 @@ td.neg { color: var(--bad); }
 #repTabs, #hsnSwitch { max-width: 100%; }
 @media (max-width: 960px) { .ec-taxgrid { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 760px) { .ec-settings { grid-template-columns: minmax(0, 1fr); gap: 10px; } .ec-static { height: auto; } }
+@media (max-width: 480px) {
+  .report-tiles { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .report-tile { display: grid; grid-template-columns: 38px minmax(0, 1fr); column-gap: 12px; row-gap: 2px; align-items: center; padding: 12px 14px; }
+  .report-tile .rt-ico { grid-row: span 2; }
+}
