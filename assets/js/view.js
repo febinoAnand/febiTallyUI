@@ -29,7 +29,9 @@ var FebiView = (function () {
     write(sessionStorage, KEY, null);
     go("index.html?next=" + encodeURIComponent(here));
   }
-  function wide() { return Math.max(window.innerWidth, document.documentElement.clientWidth || 0) >= 700; }
+  // The phone frame is for tablets and computers; a real phone (in either orientation) shows the page itself.
+  function isPhone() { return Math.min(screen.width, screen.height) < 600; }
+  function wide() { return !isPhone() && Math.max(window.innerWidth, document.documentElement.clientWidth || 0) >= 700; }
   function safeNext(n) { return /^[\w-]+\.html([?#].*)?$/.test(n || "") && !/^(index|mobile)\.html/.test(n) ? n : ""; }
 
   var api = { mode: mode, framed: framed, set: set, go: go, choose: choose, wide: wide, safeNext: safeNext, last: function () { return read(localStorage, LAST); } };

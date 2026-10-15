@@ -127,7 +127,7 @@ var Data = (function () {
     { key: "contrajournal", label: "Contra & Journal", group: "Transactions", actions: ["view", "create", "delete"] },
     { key: "einvoice", label: "e-Invoice", group: "GST Compliance", actions: ["view", "create", "delete"], note: "Create = generate IRN · Delete = cancel IRN" },
     { key: "ewaybill", label: "e-Way Bill", group: "GST Compliance", actions: ["view", "create", "edit", "delete"], note: "Edit = update vehicle / extend" },
-    { key: "ecommerce", label: "e-Commerce Import", group: "Integrations", actions: ["view", "create"], note: "Create = post settlements" },
+    { key: "ecommerce", label: "e-Commerce GST Report", group: "Integrations", actions: ["view", "create"], note: "Create = post settlements" },
     { key: "settings", label: "Settings", group: "Administration", actions: ["view", "edit"], note: "Tally Prime connection & API console" },
     { key: "users", label: "Users", group: "Administration", actions: ["view", "create", "edit", "delete"] },
     { key: "roles", label: "Roles & Permissions", group: "Administration", actions: ["view", "create", "edit", "delete"] }
